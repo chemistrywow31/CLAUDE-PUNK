@@ -33,7 +33,7 @@ const CONFIG = {
   ptyDefaultRows: 40,
   autoRunDelayMs: 300,
   agentCommands: {
-    claude: 'claude --dangerously-skip-permissions',
+    claude: '/Users/paul_huang/.local/bin/claude --dangerously-skip-permissions',
     codex: 'codex --full-auto',
   },
   fileWatchDebounceMs: 500,

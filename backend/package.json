@@ -5,13 +5,14 @@
   "type": "module",
   "scripts": {
     "start": "node server.js",
-    "dev": "node --watch server.js"
+    "dev": "node --watch server.js",
+    "postinstall": "chmod +x node_modules/node-pty/prebuilds/darwin-*/spawn-helper 2>/dev/null || true"
   },
   "dependencies": {
     "chokidar": "^3.6.0",
     "cors": "^2.8.5",
     "express": "^4.21.0",
-    "node-pty": "^1.0.0",
+    "node-pty": "^1.1.0",
     "ws": "^8.18.0"
   }
 }
