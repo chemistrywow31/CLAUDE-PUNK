@@ -1,0 +1,13 @@
+{
+  "frames": {
+    "char-idle-0":  { "frame": { "x": 0,   "y": 0, "w": 96, "h": 192 } },
+    "char-drink-0": { "frame": { "x": 96,  "y": 0, "w": 96, "h": 192 } },
+    "char-lean-0":  { "frame": { "x": 192, "y": 0, "w": 96, "h": 192 } },
+    "char-look-0":  { "frame": { "x": 288, "y": 0, "w": 96, "h": 192 } }
+  },
+  "meta": {
+    "image": "character-0.png",
+    "size": { "w": 384, "h": 192 },
+    "scale": 1
+  }
+}

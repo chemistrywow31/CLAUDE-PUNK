@@ -1,0 +1,81 @@
+/* ─── Volume Control ──────────────────────────────────────────── */
+
+.volume-control {
+  position: absolute;
+  bottom: 12px;
+  right: 12px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 12px;
+  background: rgba(10, 10, 20, 0.85);
+  border: 1px solid rgba(0, 240, 255, 0.3);
+  z-index: 100;
+  user-select: none;
+}
+
+.volume-mute-btn {
+  background: none;
+  border: 1px solid rgba(0, 240, 255, 0.4);
+  color: #00f0ff;
+  font-size: 16px;
+  width: 28px;
+  height: 28px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: color 0.15s, border-color 0.15s;
+  padding: 0;
+  font-family: var(--font-ui);
+}
+
+.volume-mute-btn:hover {
+  color: #ffffff;
+  border-color: #00f0ff;
+}
+
+.volume-mute-btn.muted {
+  color: #ff0080;
+  border-color: rgba(255, 0, 128, 0.4);
+}
+
+/* ─── Custom Range Slider ────────────────────────────────────── */
+
+.volume-slider {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 90px;
+  height: 4px;
+  background: #1a1a2e;
+  outline: none;
+  border: 1px solid rgba(0, 240, 255, 0.2);
+  cursor: pointer;
+}
+
+.volume-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 12px;
+  height: 12px;
+  background: #00f0ff;
+  border: none;
+  cursor: pointer;
+}
+
+.volume-slider::-moz-range-thumb {
+  width: 12px;
+  height: 12px;
+  background: #00f0ff;
+  border: none;
+  border-radius: 0;
+  cursor: pointer;
+}
+
+.volume-slider::-webkit-slider-thumb:hover {
+  background: #ffffff;
+}
+
+.volume-slider::-moz-range-thumb:hover {
+  background: #ffffff;
+}

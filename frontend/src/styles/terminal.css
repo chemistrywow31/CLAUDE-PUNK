@@ -1,0 +1,35 @@
+/* ─── Terminal Tab (xterm.js) ──────────────────────────────────── */
+
+.terminal-tab {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+/* xterm.js container fills the tab */
+.terminal-tab .xterm {
+  height: 100%;
+}
+
+.terminal-tab .xterm-viewport {
+  background: #0a0a14 !important;
+}
+
+/* Scrollbar styling to match cyberpunk theme */
+.terminal-tab .xterm-viewport::-webkit-scrollbar {
+  width: 6px;
+}
+
+.terminal-tab .xterm-viewport::-webkit-scrollbar-track {
+  background: #0a0a14;
+}
+
+.terminal-tab .xterm-viewport::-webkit-scrollbar-thumb {
+  background: #4a4a5e;
+  border-radius: 3px;
+}
+
+.terminal-tab .xterm-viewport::-webkit-scrollbar-thumb:hover {
+  background: #00f0ff;
+}

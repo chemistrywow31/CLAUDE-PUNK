@@ -1,0 +1,14 @@
+{
+  "frames": {
+    "bartender-idle":   { "frame": { "x": 0,   "y": 0, "w": 84, "h": 156 } },
+    "bartender-wipe":   { "frame": { "x": 84,  "y": 0, "w": 84, "h": 156 } },
+    "bartender-look-l": { "frame": { "x": 168, "y": 0, "w": 84, "h": 156 } },
+    "bartender-look-r": { "frame": { "x": 252, "y": 0, "w": 84, "h": 156 } },
+    "bartender-lean":   { "frame": { "x": 336, "y": 0, "w": 84, "h": 156 } }
+  },
+  "meta": {
+    "image": "bartender.png",
+    "size": { "w": 420, "h": 156 },
+    "scale": 1
+  }
+}

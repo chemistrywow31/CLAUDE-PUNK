@@ -1,0 +1,865 @@
+/**
+ * Claude Punk — Backend Server
+ *
+ * Single-file Node.js backend that manages Claude CLI sessions via PTY,
+ * watches file systems, and communicates with the Phaser.js frontend over
+ * raw WebSocket using a JSON envelope protocol: { type, payload, timestamp }.
+ */
+
+import express from 'express';
+import cors from 'cors';
+import { WebSocketServer } from 'ws';
+import * as pty from 'node-pty';
+import chokidar from 'chokidar';
+import crypto from 'node:crypto';
+import fs from 'node:fs';
+import path from 'node:path';
+import { EventEmitter } from 'node:events';
+import http from 'node:http';
+
+// ─── Section 1: Config ───────────────────────────────────────────────────────
+
+const CONFIG = {
+  port: parseInt(process.env.PORT || '3000', 10),
+  host: '127.0.0.1',
+  maxSessions: 16,
+  fileCountRatio: 20,
+  autoRunClaude: process.env.AUTO_RUN_CLAUDE !== 'false',
+  shell: process.env.SHELL || '/bin/zsh',
+  lineBufferFlushMs: 100,
+  heartbeatIntervalMs: 30_000,
+  ringBufferCapacity: 1000,
+  ptyDefaultCols: 120,
+  ptyDefaultRows: 40,
+  autoRunDelayMs: 300,
+  agentCommands: {
+    claude: 'claude --dangerously-skip-permissions',
+    codex: 'codex --full-auto',
+  },
+  fileWatchDebounceMs: 500,
+  fileTreeMaxDepth: 3,
+  shutdownTimeoutMs: 5000,
+};
+
+// Directories/files to exclude from file watching and tree building
+const EXCLUDED_DIRS = new Set([
+  '.git', 'node_modules', 'vendor', '__pycache__', '.venv', 'venv',
+  '.tox', '.mypy_cache', '.pytest_cache', 'dist', 'build', '.next',
+  '.nuxt', 'coverage', '.DS_Store', 'Thumbs.db',
+]);
+
+function shouldExclude(name) {
+  if (EXCLUDED_DIRS.has(name)) return true;
+  // Exclude hidden files/dirs except .claude
+  if (name.startsWith('.') && name !== '.claude') return true;
+  return false;
+}
+
+// ─── Section 2: RingBuffer ───────────────────────────────────────────────────
+
+class RingBuffer {
+  constructor(capacity = CONFIG.ringBufferCapacity) {
+    this.capacity = capacity;
+    this.buffer = new Array(capacity);
+    this.head = 0;
+    this.size = 0;
+  }
+
+  write(item) {
+    this.buffer[this.head] = item;
+    this.head = (this.head + 1) % this.capacity;
+    if (this.size < this.capacity) this.size++;
+  }
+
+  readAll() {
+    if (this.size === 0) return [];
+    const result = new Array(this.size);
+    const start = (this.head - this.size + this.capacity) % this.capacity;
+    for (let i = 0; i < this.size; i++) {
+      result[i] = this.buffer[(start + i) % this.capacity];
+    }
+    return result;
+  }
+}
+
+// ─── Section 3: LineBuffer ───────────────────────────────────────────────────
+
+class LineBuffer {
+  /**
+   * Buffers raw PTY chunks and emits clean lines via callback.
+   * @param {(stream: string, line: string) => void} onLine
+   */
+  constructor(onLine) {
+    this.onLine = onLine;
+    this.rawPartials = new Map(); // stream -> raw (unprocessed) partial string
+    this.timers = new Map();     // stream -> timeout id
+  }
+
+  /**
+   * Strip ANSI sequences that are not useful for display.
+   * Keep SGR (color) sequences (\x1b[...m) since the frontend parses them.
+   * Remove cursor movement, erase, OSC, and other control sequences.
+   */
+  static stripNonSGR(str) {
+    // 1. Remove OSC sequences: ESC ] ... BEL  or  ESC ] ... ESC \
+    str = str.replace(/\x1b\][\s\S]*?(?:\x07|\x1b\\)/g, '');
+    // 2. Remove non-SGR CSI sequences (keep \x1b[...m, remove \x1b[...X where X != m)
+    str = str.replace(/\x1b\[[\x30-\x3f]*[\x20-\x2f]*[A-LN-Za-ln-z]/g, '');
+    // 3. Remove single-char escape sequences (ESC + single char that's not '[' or ']')
+    str = str.replace(/\x1b[^[\]]/g, '');
+    return str;
+  }
+
+  /**
+   * Handle carriage returns: for each segment between \n, take text after the
+   * last \r. This handles spinners/progress bars that overwrite the same line.
+   */
+  static handleCR(str) {
+    const segments = str.split('\n');
+    for (let i = 0; i < segments.length; i++) {
+      const crIdx = segments[i].lastIndexOf('\r');
+      if (crIdx !== -1) {
+        segments[i] = segments[i].slice(crIdx + 1);
+      }
+    }
+    return segments.join('\n');
+  }
+
+  feed(stream, rawChunk) {
+    // Clear any pending flush timer for this stream
+    const existingTimer = this.timers.get(stream);
+    if (existingTimer) {
+      clearTimeout(existingTimer);
+      this.timers.delete(stream);
+    }
+
+    // Combine with any stored raw partial
+    const existing = this.rawPartials.get(stream) || '';
+    const combined = existing + rawChunk;
+
+    // Split on newlines in the raw data first
+    const rawLines = combined.split('\n');
+    // Last element is the raw partial (may be empty if chunk ended with \n)
+    const rawPartial = rawLines.pop();
+
+    // Clean and emit each complete line
+    for (const rawLine of rawLines) {
+      // Strip trailing \r (part of PTY's \r\n line ending) before CR handling,
+      // so it isn't mistaken for a line-overwrite indicator.
+      const trimmed = rawLine.replace(/\r$/, '');
+      const cleaned = LineBuffer.handleCR(LineBuffer.stripNonSGR(trimmed));
+      if (cleaned.length > 0) {
+        this.onLine(stream, cleaned);
+      }
+    }
+
+    // Store raw partial for next chunk
+    if (rawPartial && rawPartial.length > 0) {
+      this.rawPartials.set(stream, rawPartial);
+      // Set flush timer — emit partial after silence period
+      const timer = setTimeout(() => {
+        this.timers.delete(stream);
+        const remaining = this.rawPartials.get(stream);
+        if (remaining && remaining.length > 0) {
+          this.rawPartials.set(stream, '');
+          const trimmed = remaining.replace(/\r$/, '');
+          const cleaned = LineBuffer.handleCR(LineBuffer.stripNonSGR(trimmed));
+          if (cleaned.length > 0) {
+            this.onLine(stream, cleaned);
+          }
+        }
+      }, CONFIG.lineBufferFlushMs);
+      this.timers.set(stream, timer);
+    } else {
+      this.rawPartials.set(stream, '');
+    }
+  }
+
+  flush(stream) {
+    const timer = this.timers.get(stream);
+    if (timer) {
+      clearTimeout(timer);
+      this.timers.delete(stream);
+    }
+    const remaining = this.rawPartials.get(stream);
+    if (remaining && remaining.length > 0) {
+      this.rawPartials.set(stream, '');
+      const trimmed = remaining.replace(/\r$/, '');
+      const cleaned = LineBuffer.handleCR(LineBuffer.stripNonSGR(trimmed));
+      if (cleaned.length > 0) {
+        this.onLine(stream, cleaned);
+      }
+    }
+  }
+
+  destroy() {
+    for (const timer of this.timers.values()) {
+      clearTimeout(timer);
+    }
+    this.timers.clear();
+    this.rawPartials.clear();
+  }
+}
+
+// ─── Section 4: SessionManager ───────────────────────────────────────────────
+
+class SessionManager extends EventEmitter {
+  constructor() {
+    super();
+    this.sessions = new Map();
+  }
+
+  create(workDir, label, agentType = 'claude') {
+    // Validate
+    if (!workDir) throw new Error('workDir is required');
+    if (!fs.existsSync(workDir)) throw new Error(`workDir does not exist: ${workDir}`);
+    if (!fs.statSync(workDir).isDirectory()) throw new Error(`workDir is not a directory: ${workDir}`);
+    if (this.sessions.size >= CONFIG.maxSessions) {
+      throw new Error(`Maximum sessions (${CONFIG.maxSessions}) reached`);
+    }
+    if (!CONFIG.agentCommands[agentType]) {
+      throw new Error(`Unknown agentType: ${agentType}`);
+    }
+
+    const id = crypto.randomUUID();
+    const createdAt = new Date().toISOString();
+
+    // Spawn PTY with login shell
+    const proc = pty.spawn(CONFIG.shell, ['-l'], {
+      name: 'xterm-256color',
+      cwd: workDir,
+      cols: CONFIG.ptyDefaultCols,
+      rows: CONFIG.ptyDefaultRows,
+      env: { ...process.env, TERM: 'xterm-256color' },
+    });
+
+    const ringBuffer = new RingBuffer();
+
+    const lineBuffer = new LineBuffer((stream, line) => {
+      const outputMsg = { sessionId: id, stream, data: line, timestamp: new Date().toISOString() };
+      ringBuffer.write(outputMsg);
+      this.emit('session-output', outputMsg);
+    });
+
+    // node-pty merges stdout+stderr into single stream
+    proc.onData((data) => {
+      lineBuffer.feed('stdout', data);
+      // Also emit raw data for xterm.js rendering
+      this.emit('terminal-output', { sessionId: id, data });
+    });
+
+    proc.onExit(({ exitCode }) => {
+      lineBuffer.flush('stdout');
+      lineBuffer.destroy();
+
+      const session = this.sessions.get(id);
+      if (session) {
+        session.state = 'terminated';
+        session.exitCode = exitCode;
+        if (session._forceKillTimer) {
+          clearTimeout(session._forceKillTimer);
+          session._forceKillTimer = null;
+        }
+      }
+
+      this.emit('session-exit', { sessionId: id, exitCode });
+    });
+
+    const session = {
+      id,
+      state: 'active',
+      workDir,
+      label: label || path.basename(workDir),
+      agentType,
+      createdAt,
+      proc,
+      ringBuffer,
+      lineBuffer,
+      exitCode: null,
+    };
+
+    this.sessions.set(id, session);
+
+    // Auto-run agent after a short delay (lets shell init complete)
+    if (CONFIG.autoRunClaude) {
+      setTimeout(() => {
+        if (session.state === 'active') {
+          const cmd = CONFIG.agentCommands[agentType];
+          proc.write(cmd + '\n');
+        }
+      }, CONFIG.autoRunDelayMs);
+    }
+
+    return this.toPublic(session);
+  }
+
+  sendPrompt(id, prompt) {
+    const session = this.getSession(id);
+    session.proc.write(prompt + '\n');
+  }
+
+  writeRaw(id, data) {
+    const session = this.getSession(id);
+    session.proc.write(data);
+  }
+
+  resize(id, cols, rows) {
+    const session = this.getSession(id);
+    session.proc.resize(cols, rows);
+  }
+
+  kill(id) {
+    const session = this.sessions.get(id);
+    if (!session) return;
+    if (session.state === 'terminated') return;
+
+    session.state = 'terminated';
+
+    try {
+      session.proc.kill('SIGTERM');
+    } catch {
+      // already dead
+    }
+
+    // Force kill after 3s
+    session._forceKillTimer = setTimeout(() => {
+      session._forceKillTimer = null;
+      try {
+        session.proc.kill('SIGKILL');
+      } catch {
+        // already dead
+      }
+    }, 3000);
+  }
+
+  getSession(id) {
+    const session = this.sessions.get(id);
+    if (!session) throw new Error('SESSION_NOT_FOUND');
+    if (session.state === 'terminated') throw new Error('SESSION_TERMINATED');
+    return session;
+  }
+
+  getHistory(id) {
+    const session = this.sessions.get(id);
+    if (!session) return [];
+    return session.ringBuffer.readAll();
+  }
+
+  list() {
+    return Array.from(this.sessions.values()).map((s) => this.toPublic(s));
+  }
+
+  get(id) {
+    const session = this.sessions.get(id);
+    if (!session) return null;
+    return this.toPublic(session);
+  }
+
+  toPublic(session) {
+    return {
+      id: session.id,
+      state: session.state,
+      workDir: session.workDir,
+      label: session.label,
+      agentType: session.agentType,
+      createdAt: session.createdAt,
+    };
+  }
+
+  killAll() {
+    for (const [id, session] of this.sessions) {
+      if (session.state !== 'terminated') {
+        this.kill(id);
+      }
+    }
+  }
+}
+
+// ─── Section 5: FileWatcher ──────────────────────────────────────────────────
+
+class FileWatcher extends EventEmitter {
+  constructor() {
+    super();
+    this.watchers = new Map(); // sessionId -> { watcher, workDir, debounceTimer }
+  }
+
+  watch(sessionId, workDir) {
+    if (this.watchers.has(sessionId)) return;
+
+    const watcher = chokidar.watch(workDir, {
+      ignored: (filePath) => {
+        const rel = path.relative(workDir, filePath);
+        const parts = rel.split(path.sep);
+        return parts.some((p) => shouldExclude(p));
+      },
+      persistent: true,
+      ignoreInitial: false,
+      depth: 99,
+    });
+
+    const entry = { watcher, workDir, debounceTimer: null };
+
+    const debouncedUpdate = () => {
+      if (entry.debounceTimer) clearTimeout(entry.debounceTimer);
+      entry.debounceTimer = setTimeout(async () => {
+        try {
+          const fileCount = await this.countFiles(workDir);
+          const drinkCount = Math.floor(fileCount / CONFIG.fileCountRatio);
+          this.emit('files-update', { sessionId, fileCount, drinkCount });
+        } catch (err) {
+          console.error(`[FileWatcher] Error counting files for ${sessionId}:`, err.message);
+        }
+      }, CONFIG.fileWatchDebounceMs);
+    };
+
+    watcher.on('add', debouncedUpdate);
+    watcher.on('unlink', debouncedUpdate);
+    watcher.on('ready', debouncedUpdate);
+
+    this.watchers.set(sessionId, entry);
+  }
+
+  async countFiles(dir) {
+    let count = 0;
+    const walk = async (d) => {
+      let entries;
+      try {
+        entries = await fs.promises.readdir(d, { withFileTypes: true });
+      } catch {
+        return;
+      }
+      for (const entry of entries) {
+        if (shouldExclude(entry.name)) continue;
+        const full = path.join(d, entry.name);
+        if (entry.isDirectory()) {
+          await walk(full);
+        } else if (entry.isFile()) {
+          count++;
+        }
+      }
+    };
+    await walk(dir);
+    return count;
+  }
+
+  unwatch(sessionId) {
+    const entry = this.watchers.get(sessionId);
+    if (!entry) return;
+    if (entry.debounceTimer) clearTimeout(entry.debounceTimer);
+    entry.watcher.close();
+    this.watchers.delete(sessionId);
+  }
+
+  unwatchAll() {
+    for (const sessionId of this.watchers.keys()) {
+      this.unwatch(sessionId);
+    }
+  }
+}
+
+// ─── Section 6: buildFileTree ────────────────────────────────────────────────
+
+async function buildFileTree(dir, currentDepth = 0, baseDir = null) {
+  if (baseDir === null) baseDir = dir;
+  if (currentDepth >= CONFIG.fileTreeMaxDepth) return [];
+
+  let entries;
+  try {
+    entries = await fs.promises.readdir(dir, { withFileTypes: true });
+  } catch {
+    return [];
+  }
+
+  // Filter out excluded entries
+  entries = entries.filter((e) => !shouldExclude(e.name));
+
+  // Sort: dirs first, then files, alphabetical within each group
+  entries.sort((a, b) => {
+    if (a.isDirectory() && !b.isDirectory()) return -1;
+    if (!a.isDirectory() && b.isDirectory()) return 1;
+    return a.name.localeCompare(b.name);
+  });
+
+  const nodes = [];
+  for (const entry of entries) {
+    const fullPath = path.join(dir, entry.name);
+    const relPath = path.relative(baseDir, fullPath);
+
+    if (entry.isDirectory()) {
+      const children = await buildFileTree(fullPath, currentDepth + 1, baseDir);
+      nodes.push({
+        name: entry.name,
+        path: relPath,
+        isDir: true,
+        children,
+      });
+    } else if (entry.isFile()) {
+      let size = 0;
+      try {
+        const stat = await fs.promises.stat(fullPath);
+        size = stat.size;
+      } catch {
+        // ignore
+      }
+      nodes.push({
+        name: entry.name,
+        path: relPath,
+        isDir: false,
+        size,
+      });
+    }
+  }
+
+  return nodes;
+}
+
+// ─── Section 7: readClaudeConfig ─────────────────────────────────────────────
+
+async function readClaudeConfig(workDir) {
+  const claudeDir = path.join(workDir, '.claude');
+  const files = [];
+
+  async function walk(dir, prefix = '') {
+    let entries;
+    try {
+      entries = await fs.promises.readdir(dir, { withFileTypes: true });
+    } catch {
+      return;
+    }
+    for (const entry of entries) {
+      const rel = prefix ? `${prefix}/${entry.name}` : entry.name;
+      const full = path.join(dir, entry.name);
+      if (entry.isDirectory()) {
+        await walk(full, rel);
+      } else if (entry.isFile() && entry.name.endsWith('.md')) {
+        try {
+          const content = await fs.promises.readFile(full, 'utf-8');
+          files.push({ name: rel, content });
+        } catch {
+          // skip unreadable
+        }
+      }
+    }
+  }
+
+  await walk(claudeDir);
+  return files;
+}
+
+// ─── Section 8: WebSocket Server ─────────────────────────────────────────────
+
+function createWSS(server, sessionManager, fileWatcher) {
+  const wss = new WebSocketServer({ server, path: '/ws' });
+
+  // --- Helpers ---
+
+  function sendToClient(ws, type, payload) {
+    if (ws.readyState !== ws.OPEN) return;
+    ws.send(JSON.stringify({ type, payload, timestamp: new Date().toISOString() }));
+  }
+
+  function broadcast(type, payload) {
+    const msg = JSON.stringify({ type, payload, timestamp: new Date().toISOString() });
+    for (const client of wss.clients) {
+      if (client.readyState === client.OPEN) {
+        client.send(msg);
+      }
+    }
+  }
+
+  // --- Heartbeat ---
+
+  const heartbeat = setInterval(() => {
+    for (const ws of wss.clients) {
+      if (ws._alive === false) {
+        ws.terminate();
+        continue;
+      }
+      ws._alive = false;
+      ws.ping();
+    }
+  }, CONFIG.heartbeatIntervalMs);
+
+  wss.on('close', () => clearInterval(heartbeat));
+
+  // --- Wire SessionManager events to WS broadcast ---
+
+  sessionManager.on('session-output', (payload) => {
+    broadcast('session.output', payload);
+  });
+
+  sessionManager.on('terminal-output', (payload) => {
+    broadcast('terminal.output', payload);
+  });
+
+  sessionManager.on('session-exit', (payload) => {
+    broadcast('session.terminated', payload);
+  });
+
+  fileWatcher.on('files-update', (payload) => {
+    broadcast('files.update', payload);
+  });
+
+  // --- Connection handling ---
+
+  wss.on('connection', (ws) => {
+    ws._alive = true;
+    ws.on('pong', () => { ws._alive = true; });
+
+    // Replay: send all current session states
+    for (const session of sessionManager.list()) {
+      sendToClient(ws, 'session.update', session);
+    }
+
+    // Replay: send output history for each active session
+    for (const session of sessionManager.list()) {
+      const history = sessionManager.getHistory(session.id);
+      for (const msg of history) {
+        sendToClient(ws, 'session.output', msg);
+      }
+    }
+
+    // Message router
+    ws.on('message', async (raw) => {
+      let msg;
+      try {
+        msg = JSON.parse(raw.toString());
+      } catch {
+        sendToClient(ws, 'error', { message: 'Invalid JSON', code: 'INVALID_MESSAGE' });
+        return;
+      }
+
+      if (!msg.type || msg.payload === undefined) {
+        sendToClient(ws, 'error', { message: 'Missing type or payload', code: 'INVALID_MESSAGE' });
+        return;
+      }
+
+      try {
+        switch (msg.type) {
+          case 'session.create': {
+            const { workDir, label, agentType = 'claude' } = msg.payload;
+            if (!workDir) {
+              sendToClient(ws, 'error', { message: 'workDir is required', code: 'INVALID_MESSAGE' });
+              return;
+            }
+            const session = sessionManager.create(workDir, label, agentType);
+            broadcast('session.update', session);
+            fileWatcher.watch(session.id, workDir);
+            break;
+          }
+
+          case 'session.prompt': {
+            const { sessionId, prompt } = msg.payload;
+            if (!sessionId || !prompt) {
+              sendToClient(ws, 'error', { message: 'sessionId and prompt are required', code: 'INVALID_MESSAGE' });
+              return;
+            }
+            sessionManager.sendPrompt(sessionId, prompt);
+            break;
+          }
+
+          case 'terminal.input': {
+            const { sessionId, data } = msg.payload;
+            if (!sessionId || data === undefined) {
+              sendToClient(ws, 'error', { message: 'sessionId and data are required', code: 'INVALID_MESSAGE' });
+              return;
+            }
+            sessionManager.writeRaw(sessionId, data);
+            break;
+          }
+
+          case 'terminal.resize': {
+            const { sessionId, cols, rows } = msg.payload;
+            if (!sessionId || !cols || !rows) {
+              sendToClient(ws, 'error', { message: 'sessionId, cols, and rows are required', code: 'INVALID_MESSAGE' });
+              return;
+            }
+            sessionManager.resize(sessionId, cols, rows);
+            break;
+          }
+
+          case 'session.kill': {
+            const { sessionId } = msg.payload;
+            if (!sessionId) {
+              sendToClient(ws, 'error', { message: 'sessionId is required', code: 'INVALID_MESSAGE' });
+              return;
+            }
+            sessionManager.kill(sessionId);
+            fileWatcher.unwatch(sessionId);
+            break;
+          }
+
+          case 'files.requestTree': {
+            const { sessionId } = msg.payload;
+            if (!sessionId) {
+              sendToClient(ws, 'error', { message: 'sessionId is required', code: 'INVALID_MESSAGE' });
+              return;
+            }
+            const session = sessionManager.get(sessionId);
+            if (!session) {
+              sendToClient(ws, 'error', { message: 'Session not found', code: 'SESSION_NOT_FOUND' });
+              return;
+            }
+            const tree = await buildFileTree(session.workDir);
+            sendToClient(ws, 'files.tree', { sessionId, tree });
+            break;
+          }
+
+          case 'fs.browse': {
+            const { path: dirPath } = msg.payload;
+            const targetPath = dirPath || process.env.HOME || '/';
+            try {
+              const resolved = path.resolve(targetPath);
+              const stat = await fs.promises.stat(resolved);
+              if (!stat.isDirectory()) {
+                sendToClient(ws, 'error', { message: `Not a directory: ${resolved}`, code: 'INVALID_PATH' });
+                return;
+              }
+              const entries = await fs.promises.readdir(resolved, { withFileTypes: true });
+              const filtered = entries
+                .filter((e) => !shouldExclude(e.name))
+                .map((e) => ({ name: e.name, isDir: e.isDirectory() }))
+                .sort((a, b) => {
+                  if (a.isDir && !b.isDir) return -1;
+                  if (!a.isDir && b.isDir) return 1;
+                  return a.name.localeCompare(b.name);
+                });
+              const parent = resolved === '/' ? null : path.dirname(resolved);
+              sendToClient(ws, 'fs.browse.result', { path: resolved, parent, entries: filtered });
+            } catch (err) {
+              sendToClient(ws, 'error', { message: `Cannot read directory: ${err.message}`, code: 'INVALID_PATH' });
+            }
+            break;
+          }
+
+          case 'claude.requestConfig': {
+            const { sessionId } = msg.payload;
+            if (!sessionId) {
+              sendToClient(ws, 'error', { message: 'sessionId is required', code: 'INVALID_MESSAGE' });
+              return;
+            }
+            const session = sessionManager.get(sessionId);
+            if (!session) {
+              sendToClient(ws, 'error', { message: 'Session not found', code: 'SESSION_NOT_FOUND' });
+              return;
+            }
+            const files = await readClaudeConfig(session.workDir);
+            sendToClient(ws, 'claude.config', { sessionId, files });
+            break;
+          }
+
+          default:
+            sendToClient(ws, 'error', { message: `Unknown message type: ${msg.type}`, code: 'INVALID_MESSAGE' });
+        }
+      } catch (err) {
+        const code = err.message === 'SESSION_NOT_FOUND' ? 'SESSION_NOT_FOUND'
+          : err.message === 'SESSION_TERMINATED' ? 'SESSION_TERMINATED'
+          : err.message.includes('Maximum sessions') ? 'MAX_SESSIONS'
+          : err.message.includes('workDir') ? 'SPAWN_FAILED'
+          : 'INVALID_MESSAGE';
+        sendToClient(ws, 'error', { message: err.message, code });
+      }
+    });
+
+    ws.on('close', () => {
+      // Cleanup if needed
+    });
+  });
+
+  return { wss, broadcast };
+}
+
+// ─── Section 9: REST API ─────────────────────────────────────────────────────
+
+function createRESTRouter(sessionManager, fileWatcher, broadcastFn) {
+  const router = express.Router();
+
+  router.post('/sessions', (req, res) => {
+    try {
+      const { cwd, workDir, label, agentType } = req.body;
+      const dir = cwd || workDir;
+      if (!dir) {
+        return res.status(400).json({ error: 'cwd or workDir is required' });
+      }
+      const session = sessionManager.create(dir, label, agentType);
+      broadcastFn('session.update', session);
+      fileWatcher.watch(session.id, dir);
+      res.status(201).json(session);
+    } catch (err) {
+      const status = err.message.includes('Maximum sessions') ? 429
+        : err.message.includes('does not exist') ? 400
+        : 500;
+      res.status(status).json({ error: err.message });
+    }
+  });
+
+  router.get('/sessions', (_req, res) => {
+    res.json(sessionManager.list());
+  });
+
+  router.get('/sessions/:id', (req, res) => {
+    const session = sessionManager.get(req.params.id);
+    if (!session) return res.status(404).json({ error: 'Session not found' });
+    res.json(session);
+  });
+
+  router.delete('/sessions/:id', (req, res) => {
+    const session = sessionManager.get(req.params.id);
+    if (!session) return res.status(404).json({ error: 'Session not found' });
+    sessionManager.kill(req.params.id);
+    fileWatcher.unwatch(req.params.id);
+    res.json({ ok: true });
+  });
+
+  return router;
+}
+
+// ─── Section 10: Startup & Shutdown ──────────────────────────────────────────
+
+const app = express();
+app.use(cors());
+app.use(express.json());
+
+const httpServer = http.createServer(app);
+
+const sessionManager = new SessionManager();
+const fileWatcher = new FileWatcher();
+
+const { wss, broadcast } = createWSS(httpServer, sessionManager, fileWatcher);
+
+app.use('/api', createRESTRouter(sessionManager, fileWatcher, broadcast));
+
+// Health check
+app.get('/health', (_req, res) => res.json({ ok: true }));
+
+httpServer.listen(CONFIG.port, CONFIG.host, () => {
+  console.log(`[Claude Punk] Backend running on http://${CONFIG.host}:${CONFIG.port}`);
+  console.log(`[Claude Punk] WebSocket at ws://${CONFIG.host}:${CONFIG.port}/ws`);
+  console.log(`[Claude Punk] Shell: ${CONFIG.shell}`);
+  console.log(`[Claude Punk] Auto-run Claude: ${CONFIG.autoRunClaude}`);
+  console.log(`[Claude Punk] Max sessions: ${CONFIG.maxSessions}`);
+});
+
+// Graceful shutdown
+function shutdown(signal) {
+  console.log(`\n[Claude Punk] Received ${signal}, shutting down...`);
+
+  sessionManager.killAll();
+  fileWatcher.unwatchAll();
+
+  wss.close(() => {
+    httpServer.close(() => {
+      console.log('[Claude Punk] Server closed cleanly.');
+      process.exit(0);
+    });
+  });
+
+  // Force exit after timeout
+  setTimeout(() => {
+    console.log('[Claude Punk] Forcing exit after timeout.');
+    process.exit(1);
+  }, CONFIG.shutdownTimeoutMs).unref();
+}
+
+process.on('SIGINT', () => shutdown('SIGINT'));
+process.on('SIGTERM', () => shutdown('SIGTERM'));

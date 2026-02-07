@@ -1,0 +1,442 @@
+/* ─── Folder Picker Overlay ────────────────────────────────────── */
+
+#folder-picker-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0, 0, 0, 0.7);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1001;
+}
+
+.folder-picker-panel {
+  width: 540px;
+  max-width: 90vw;
+  max-height: 85vh;
+  display: flex;
+  flex-direction: column;
+  padding: 0;
+}
+
+/* ─── Header ──────────────────────────────────────────────────── */
+
+.fp-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px;
+  border-bottom: 1px solid rgba(0, 240, 255, 0.2);
+  flex-shrink: 0;
+}
+
+.fp-title {
+  font-family: var(--font-ui);
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--border-neon);
+  text-transform: uppercase;
+  letter-spacing: 2px;
+}
+
+.fp-close {
+  background: none;
+  border: 1px solid var(--text-secondary);
+  color: var(--text-secondary);
+  font-size: 18px;
+  width: 28px;
+  height: 28px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.15s;
+}
+
+.fp-close:hover {
+  border-color: var(--accent-pink);
+  color: var(--accent-pink);
+}
+
+/* ─── Breadcrumb ─────────────────────────────────────────────── */
+
+.fp-breadcrumb {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 16px;
+  border-bottom: 1px solid rgba(0, 240, 255, 0.1);
+  flex-shrink: 0;
+  overflow-x: auto;
+}
+
+.fp-back {
+  background: none;
+  border: 1px solid var(--text-secondary);
+  color: var(--text-secondary);
+  font-size: 14px;
+  width: 24px;
+  height: 24px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  transition: all 0.15s;
+}
+
+.fp-back:hover {
+  border-color: var(--border-neon);
+  color: var(--border-neon);
+}
+
+.fp-breadcrumb-path {
+  display: flex;
+  align-items: center;
+  gap: 1px;
+  overflow-x: auto;
+  white-space: nowrap;
+  font-family: var(--font-mono);
+  font-size: 11px;
+}
+
+.fp-crumb {
+  color: var(--text-secondary);
+  cursor: pointer;
+  padding: 2px 2px;
+  transition: color 0.1s;
+}
+
+.fp-crumb:hover {
+  color: var(--border-neon);
+}
+
+.fp-crumb-current {
+  color: var(--text-primary);
+  font-weight: 700;
+}
+
+.fp-crumb-sep {
+  color: var(--text-secondary);
+  opacity: 0.5;
+}
+
+/* ─── Browser Area ───────────────────────────────────────────── */
+
+.fp-browser {
+  flex: 1;
+  overflow-y: auto;
+  min-height: 0;
+  padding: 8px 0;
+}
+
+.fp-section-label {
+  font-family: var(--font-ui);
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 2px;
+  padding: 4px 16px;
+}
+
+/* ─── Recent Folders ─────────────────────────────────────────── */
+
+.fp-recent-section {
+  margin-bottom: 8px;
+  border-bottom: 1px solid rgba(0, 240, 255, 0.1);
+  padding-bottom: 8px;
+}
+
+.fp-recent-list {
+  padding: 0 16px;
+}
+
+.fp-recent-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 8px;
+  cursor: pointer;
+  transition: background 0.1s;
+}
+
+.fp-recent-item:hover {
+  background: rgba(0, 240, 255, 0.05);
+}
+
+.fp-recent-info {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex: 1;
+  min-width: 0;
+}
+
+.fp-recent-name {
+  font-family: var(--font-ui);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--border-neon);
+  min-width: 100px;
+  flex-shrink: 0;
+}
+
+.fp-recent-path {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--text-secondary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.fp-recent-delete {
+  background: none;
+  border: none;
+  color: var(--text-secondary);
+  font-size: 16px;
+  width: 22px;
+  height: 22px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  opacity: 0;
+  transition: all 0.15s;
+}
+
+.fp-recent-item:hover .fp-recent-delete {
+  opacity: 1;
+}
+
+.fp-recent-delete:hover {
+  color: var(--accent-pink);
+}
+
+/* ─── Directory Listing ──────────────────────────────────────── */
+
+.fp-listing {
+  padding: 0 16px;
+  min-height: 120px;
+}
+
+.fp-entries {
+  /* shown by default */
+}
+
+.fp-entry {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 3px 8px;
+  font-family: var(--font-mono);
+  font-size: 12px;
+}
+
+.fp-entry-dir {
+  color: var(--border-neon);
+  cursor: pointer;
+  transition: background 0.1s;
+}
+
+.fp-entry-dir:hover {
+  background: rgba(0, 240, 255, 0.08);
+}
+
+.fp-entry-file {
+  color: var(--text-secondary);
+}
+
+.fp-entry-icon {
+  flex-shrink: 0;
+  width: 20px;
+  text-align: center;
+  font-size: 13px;
+}
+
+.fp-entry-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.fp-loading {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--text-secondary);
+  padding: 16px 8px;
+  text-align: center;
+}
+
+.fp-empty {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--text-secondary);
+  padding: 16px 8px;
+  text-align: center;
+}
+
+/* ─── Footer (inputs + actions) ──────────────────────────────── */
+
+.fp-footer {
+  padding: 12px 16px;
+  border-top: 1px solid rgba(0, 240, 255, 0.2);
+  flex-shrink: 0;
+}
+
+.fp-field {
+  margin-bottom: 8px;
+}
+
+.fp-field label {
+  display: block;
+  font-family: var(--font-ui);
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  margin-bottom: 2px;
+}
+
+.fp-field input {
+  width: 100%;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--text-primary);
+  background: var(--bg-primary);
+  border: 1px solid var(--text-secondary);
+  padding: 6px 10px;
+  outline: none;
+  box-sizing: border-box;
+  transition: border-color 0.15s;
+}
+
+.fp-field input:focus {
+  border-color: var(--border-neon);
+  box-shadow: 0 0 6px rgba(0, 240, 255, 0.2);
+}
+
+.fp-field input::placeholder {
+  color: rgba(136, 136, 170, 0.5);
+}
+
+/* ─── Agent Selector ──────────────────────────────────────────── */
+
+.fp-agent-select {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+
+.fp-agent-option {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+}
+
+.fp-agent-option input[type="radio"] {
+  appearance: none;
+  width: 14px;
+  height: 14px;
+  border: 1px solid var(--text-secondary);
+  background: var(--bg-primary);
+  cursor: pointer;
+  position: relative;
+  flex-shrink: 0;
+}
+
+.fp-agent-option input[type="radio"]:checked {
+  border-color: var(--border-neon);
+}
+
+.fp-agent-option input[type="radio"]:checked::after {
+  content: '';
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 8px;
+  height: 8px;
+  background: var(--border-neon);
+}
+
+.fp-agent-label {
+  font-family: var(--font-ui);
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+
+.fp-agent-claude {
+  color: #ffaa00;
+}
+
+.fp-agent-codex {
+  color: #00a0ff;
+}
+
+/* ─── Actions ─────────────────────────────────────────────────── */
+
+.fp-actions {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+  margin-top: 8px;
+}
+
+.fp-cancel {
+  font-family: var(--font-ui);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  background: none;
+  border: 1px solid var(--text-secondary);
+  padding: 6px 16px;
+  cursor: pointer;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  transition: all 0.15s;
+}
+
+.fp-cancel:hover {
+  border-color: var(--text-primary);
+  color: var(--text-primary);
+}
+
+.fp-confirm {
+  font-family: var(--font-ui);
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--bg-primary);
+  background: var(--border-neon);
+  border: none;
+  padding: 6px 20px;
+  cursor: pointer;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  transition: all 0.15s;
+}
+
+.fp-confirm:hover {
+  background: #44ffff;
+  box-shadow: 0 0 12px rgba(0, 240, 255, 0.5);
+}
+
+/* ─── Error ───────────────────────────────────────────────────── */
+
+.fp-error {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--accent-pink);
+  margin-top: 8px;
+  padding: 6px 8px;
+  border: 1px solid rgba(255, 0, 128, 0.3);
+  background: rgba(255, 0, 128, 0.05);
+}

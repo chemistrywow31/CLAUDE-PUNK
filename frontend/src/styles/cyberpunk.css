@@ -1,0 +1,124 @@
+/* ─── Cyberpunk Design Tokens ─────────────────────────────────── */
+
+:root {
+  --bg-primary: #0a0a14;
+  --bg-secondary: #12121f;
+  --bg-panel: #1a1a2e;
+  --border-neon: #00f0ff;
+  --border-glow: 0 0 10px rgba(0, 240, 255, 0.3);
+  --text-primary: #e0e0e0;
+  --text-secondary: #8888aa;
+  --accent-pink: #ff0080;
+  --accent-amber: #ffaa00;
+  --accent-purple: #8040c0;
+  --font-mono: 'JetBrains Mono', 'Fira Code', monospace;
+  --font-ui: 'Rajdhani', 'Orbitron', sans-serif;
+}
+
+/* ─── Base Reset ──────────────────────────────────────────────── */
+
+.hidden {
+  display: none !important;
+}
+
+/* ─── Cyberpunk Panel ─────────────────────────────────────────── */
+
+.cyberpunk-panel {
+  background: rgba(10, 10, 20, 0.95);
+  border: 1px solid var(--border-neon);
+  box-shadow:
+    var(--border-glow),
+    inset 0 0 20px rgba(0, 240, 255, 0.05);
+  position: relative;
+}
+
+/* Corner accents */
+.cyberpunk-panel::before,
+.cyberpunk-panel::after {
+  content: '';
+  position: absolute;
+  width: 8px;
+  height: 8px;
+  border-color: var(--border-neon);
+  border-style: solid;
+}
+
+.cyberpunk-panel::before {
+  top: -1px;
+  left: -1px;
+  border-width: 2px 0 0 2px;
+}
+
+.cyberpunk-panel::after {
+  bottom: -1px;
+  right: -1px;
+  border-width: 0 2px 2px 0;
+}
+
+/* ─── Scrollbar ───────────────────────────────────────────────── */
+
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--bg-primary);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--text-secondary);
+  border-radius: 0;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--border-neon);
+}
+
+/* ─── Status Badges ───────────────────────────────────────────── */
+
+.status-badge {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  padding: 2px 8px;
+  border-radius: 0;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+
+.status-badge.active,
+.status-badge.creating {
+  color: var(--border-neon);
+  border: 1px solid var(--border-neon);
+}
+
+.status-badge.idle {
+  color: var(--accent-amber);
+  border: 1px solid var(--accent-amber);
+}
+
+.status-badge.terminated {
+  color: var(--accent-pink);
+  border: 1px solid var(--accent-pink);
+}
+
+/* ─── ANSI Color Classes ──────────────────────────────────────── */
+
+.ansi-black { color: #0a0a14; }
+.ansi-red { color: #ff4444; }
+.ansi-green { color: #44ff44; }
+.ansi-yellow { color: #ffaa00; }
+.ansi-blue { color: #4444ff; }
+.ansi-magenta { color: #ff0080; }
+.ansi-cyan { color: #00f0ff; }
+.ansi-white { color: #e0e0e0; }
+.ansi-bright-black { color: #8888aa; }
+.ansi-bright-red { color: #ff6666; }
+.ansi-bright-green { color: #66ff66; }
+.ansi-bright-yellow { color: #ffcc44; }
+.ansi-bright-blue { color: #6666ff; }
+.ansi-bright-magenta { color: #ff44aa; }
+.ansi-bright-cyan { color: #44ffff; }
+.ansi-bright-white { color: #ffffff; }
+.ansi-bold { font-weight: 700; }
+.ansi-dim { opacity: 0.6; }
