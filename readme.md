@@ -51,6 +51,12 @@ nvm install 20
 nvm use 20
 ```
 
+### node-pty dependencies
+```
+sudo apt-get update
+sudo apt-get install -y make python build-essential
+```
+
 ### Claude Code CLI
 
 This project spawns Claude Code as a subprocess. Install it globally:
