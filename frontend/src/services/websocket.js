@@ -145,6 +145,14 @@ class WebSocketService {
   resizeTerminal(sessionId, cols, rows) {
     return this.send('terminal.resize', { sessionId, cols, rows });
   }
+
+  readFile(sessionId, filePath) {
+    return this.send('file.read', { sessionId, filePath });
+  }
+
+  writeFile(sessionId, filePath, content) {
+    return this.send('file.write', { sessionId, filePath, content });
+  }
 }
 
 // Singleton

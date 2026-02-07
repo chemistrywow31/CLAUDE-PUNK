@@ -742,6 +742,83 @@ function createWSS(server, sessionManager, fileWatcher) {
             break;
           }
 
+          case 'file.read': {
+            const { sessionId, filePath } = msg.payload;
+            if (!sessionId || !filePath) {
+              sendToClient(ws, 'error', { message: 'sessionId and filePath are required', code: 'INVALID_MESSAGE' });
+              return;
+            }
+            const readSession = sessionManager.get(sessionId);
+            if (!readSession) {
+              sendToClient(ws, 'error', { message: 'Session not found', code: 'SESSION_NOT_FOUND' });
+              return;
+            }
+            const absPath = path.resolve(readSession.workDir, filePath);
+            if (!absPath.startsWith(readSession.workDir)) {
+              sendToClient(ws, 'error', { message: 'Path traversal not allowed', code: 'INVALID_MESSAGE' });
+              return;
+            }
+            try {
+              const stat = await fs.promises.stat(absPath);
+              if (stat.size > 5 * 1024 * 1024) {
+                sendToClient(ws, 'error', { message: 'File too large (max 5MB)', code: 'INVALID_MESSAGE' });
+                return;
+              }
+              const ext = path.extname(absPath).toLowerCase();
+              const imageExts = new Set(['.png', '.jpg', '.jpeg', '.gif', '.webp', '.svg', '.ico', '.bmp']);
+              const isImage = imageExts.has(ext);
+              if (isImage) {
+                const buf = await fs.promises.readFile(absPath);
+                sendToClient(ws, 'file.content', {
+                  sessionId,
+                  filePath,
+                  content: buf.toString('base64'),
+                  encoding: 'base64',
+                  fileType: 'image',
+                  size: stat.size,
+                });
+              } else {
+                const content = await fs.promises.readFile(absPath, 'utf-8');
+                sendToClient(ws, 'file.content', {
+                  sessionId,
+                  filePath,
+                  content,
+                  encoding: 'utf-8',
+                  fileType: 'text',
+                  size: stat.size,
+                });
+              }
+            } catch (err) {
+              sendToClient(ws, 'error', { message: `Cannot read file: ${err.message}`, code: 'INVALID_MESSAGE' });
+            }
+            break;
+          }
+
+          case 'file.write': {
+            const { sessionId, filePath, content } = msg.payload;
+            if (!sessionId || !filePath || content === undefined) {
+              sendToClient(ws, 'error', { message: 'sessionId, filePath, and content are required', code: 'INVALID_MESSAGE' });
+              return;
+            }
+            const writeSession = sessionManager.get(sessionId);
+            if (!writeSession) {
+              sendToClient(ws, 'error', { message: 'Session not found', code: 'SESSION_NOT_FOUND' });
+              return;
+            }
+            const writeAbsPath = path.resolve(writeSession.workDir, filePath);
+            if (!writeAbsPath.startsWith(writeSession.workDir)) {
+              sendToClient(ws, 'error', { message: 'Path traversal not allowed', code: 'INVALID_MESSAGE' });
+              return;
+            }
+            try {
+              await fs.promises.writeFile(writeAbsPath, content, 'utf-8');
+              sendToClient(ws, 'file.saved', { sessionId, filePath });
+            } catch (err) {
+              sendToClient(ws, 'error', { message: `Cannot write file: ${err.message}`, code: 'INVALID_MESSAGE' });
+            }
+            break;
+          }
+
           case 'claude.requestConfig': {
             const { sessionId } = msg.payload;
             if (!sessionId) {

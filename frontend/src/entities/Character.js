@@ -237,6 +237,17 @@ export default class Character {
     }
   }
 
+  /**
+   * Set a hotkey letter and update the name label to show it.
+   * @param {string} letter - Single letter hotkey (e.g. 'a')
+   */
+  setHotkey(letter) {
+    this.hotkey = letter;
+    if (this.nameText) {
+      this.nameText.setText(`(${letter}) ${this.label}`);
+    }
+  }
+
   getPosition() {
     return { x: this.sprite?.x || 0, y: this.sprite?.y || 0 };
   }

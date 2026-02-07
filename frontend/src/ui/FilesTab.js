@@ -1,9 +1,10 @@
 /**
- * Files tab — displays directory tree with collapsible folders.
- * Requests file tree from backend when activated.
+ * Files tab — split layout with directory tree sidebar (left) and
+ * FileEditor pane (right) for viewing/editing files.
  */
 
 import wsService from '../services/websocket.js';
+import FileEditor from './FileEditor.js';
 
 export default class FilesTab {
   constructor(sessionId) {
@@ -14,22 +15,34 @@ export default class FilesTab {
     this.drinkCount = 0;
     this.unsubFiles = null;
     this.unsubTree = null;
+    this.fileEditor = null;
+    this.selectedNode = null;
   }
 
   render(container) {
     this.el = document.createElement('div');
     this.el.className = 'files-tab';
-    this.el.innerHTML = `
+
+    // Left sidebar
+    const sidebar = document.createElement('div');
+    sidebar.className = 'files-sidebar';
+    sidebar.innerHTML = `
       <div class="files-header">
-        <span class="files-count">${this.fileCount} files → ${this.drinkCount} drinks</span>
-        <button class="files-refresh" title="Refresh">↻</button>
+        <span class="files-count">${this.fileCount} files \u2192 ${this.drinkCount} drinks</span>
+        <button class="files-refresh" title="Refresh">\u21bb</button>
       </div>
       <div class="files-tree"></div>
     `;
-    container.appendChild(this.el);
-    this.treeEl = this.el.querySelector('.files-tree');
+    this.el.appendChild(sidebar);
 
-    this.el.querySelector('.files-refresh').addEventListener('click', () => {
+    // Right editor pane
+    this.fileEditor = new FileEditor(this.sessionId);
+    this.fileEditor.render(this.el);
+
+    container.appendChild(this.el);
+    this.treeEl = sidebar.querySelector('.files-tree');
+
+    sidebar.querySelector('.files-refresh').addEventListener('click', () => {
       this.requestTree();
     });
 
@@ -44,9 +57,9 @@ export default class FilesTab {
       if (payload.sessionId !== this.sessionId) return;
       this.fileCount = payload.fileCount;
       this.drinkCount = payload.drinkCount;
-      const countEl = this.el.querySelector('.files-count');
+      const countEl = sidebar.querySelector('.files-count');
       if (countEl) {
-        countEl.textContent = `${this.fileCount} files → ${this.drinkCount} drinks`;
+        countEl.textContent = `${this.fileCount} files \u2192 ${this.drinkCount} drinks`;
       }
     });
 
@@ -55,7 +68,9 @@ export default class FilesTab {
   }
 
   requestTree() {
-    this.treeEl.innerHTML = '<div class="files-loading">Loading...</div>';
+    if (this.treeEl) {
+      this.treeEl.innerHTML = '<div class="files-loading">Loading...</div>';
+    }
     wsService.requestFileTree(this.sessionId);
   }
 
@@ -82,20 +97,32 @@ export default class FilesTab {
       label.className = 'file-label';
 
       if (node.isDir) {
-        label.textContent = `▸ ${node.name}/`;
+        label.textContent = `\u25b8 ${node.name}/`;
         label.addEventListener('click', () => {
           li.classList.toggle('expanded');
           label.textContent = li.classList.contains('expanded')
-            ? `▾ ${node.name}/`
-            : `▸ ${node.name}/`;
+            ? `\u25be ${node.name}/`
+            : `\u25b8 ${node.name}/`;
         });
       } else {
         const size = this.formatSize(node.size || 0);
         label.textContent = `  ${node.name}`;
+
         const sizeSpan = document.createElement('span');
         sizeSpan.className = 'file-size';
         sizeSpan.textContent = size;
         label.appendChild(sizeSpan);
+
+        // Click file to open in editor
+        label.addEventListener('click', () => {
+          // Deselect previous
+          if (this.selectedNode) {
+            this.selectedNode.classList.remove('selected');
+          }
+          li.classList.add('selected');
+          this.selectedNode = li;
+          this.fileEditor.openFile(node.path);
+        });
       }
 
       li.appendChild(label);
@@ -120,6 +147,7 @@ export default class FilesTab {
   destroy() {
     if (this.unsubTree) this.unsubTree();
     if (this.unsubFiles) this.unsubFiles();
+    if (this.fileEditor) this.fileEditor.destroy();
     if (this.el && this.el.parentNode) {
       this.el.parentNode.removeChild(this.el);
     }

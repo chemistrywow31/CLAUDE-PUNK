@@ -28,7 +28,8 @@ export default class DialogBox {
           <span id="dialog-title">Session</span>
           <span id="dialog-status" class="status-badge">active</span>
           <button id="dialog-kill" class="kill-btn" title="Terminate session">KILL</button>
-          <button id="dialog-close">&times;</button>
+          <span id="dialog-shortcut" class="shortcut-hint">Ctrl+\`</span>
+          <button id="dialog-close" title="Close (Ctrl+\`)">&times;</button>
         </div>
         <div id="dialog-tabs">
           <button class="tab active" data-tab="cli">Terminal</button>
@@ -68,14 +69,6 @@ export default class DialogBox {
     promptSend.addEventListener('click', () => this.sendPrompt());
     promptInput.addEventListener('keydown', (e) => {
       if (e.key === 'Enter') this.sendPrompt();
-      if (e.key === 'Escape') this.close();
-    });
-
-    // Keyboard: Escape to close
-    document.addEventListener('keydown', (e) => {
-      if (e.key === 'Escape' && this.visible) {
-        this.close();
-      }
     });
 
     // Listen for session state changes

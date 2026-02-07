@@ -33,8 +33,9 @@ A cyberpunk pixel-art bar game that turns AI coding agents into bar patrons. Eac
 1. You pick a project folder via the in-game door
 2. A coding agent (Claude or Codex) spawns in a terminal session
 3. The agent appears as a character in the bar, walks to a seat and starts working
-4. Click on a character to see their terminal output, file tree, and config
-5. The more files in the project, the more drinks appear on the table
+4. Each character shows a hotkey label like `(a)` above their name — press the letter to open their dialog instantly
+5. Click on a character (or press their hotkey) to interact: terminal, file editor, config
+6. The more files in the project, the more drinks appear on the table
 
 ## Prerequisites
 
@@ -132,39 +133,64 @@ Vite automatically proxies `/ws` and `/api` requests to the backend, so everythi
 1. Open `http://localhost:5173` in your browser
 2. Click the **door** on the right side of the bar to open the folder picker
 3. Select a project directory — a new agent session spawns
-4. The character walks from the door to an empty seat
-5. Click on a seated character to open the dialog panel with 3 tabs:
-   - **Terminal** — live terminal output from the agent
-   - **Files** — file tree of the project directory
+4. The character walks from the door to an empty seat, with a hotkey label `(a)` above their name
+5. Press the hotkey letter (e.g. `a`) to open the dialog, or click on the character directly
+6. The dialog panel has 3 tabs:
+   - **Terminal** — live xterm.js terminal with a **File Warp** sidebar on the left. Click any file or folder name in the sidebar to insert its path into the terminal.
+   - **Files** — split view with a file tree sidebar (left) and a **Monaco code editor + preview** pane (right). Click a file to open it. Markdown, HTML, and SVG files open in rendered preview by default — toggle the `CODE` button to see source. Toggle `READ-ONLY` to `EDITING` mode and hit `SAVE` to write changes back to disk.
    - **Config** — `.claude/` configuration files
+7. Press `Ctrl+`` ` to close the dialog (works even when the terminal has focus), or click the X button
+
+## Keyboard Shortcuts
+
+| Shortcut | Context | Action |
+|----------|---------|--------|
+| `Ctrl+`` ` | Anywhere | Close any open overlay (dialog, folder picker, jukebox) |
+| `Escape` | When not focused in terminal | Close current overlay |
+| `a` - `z` | Bar scene (no overlay open) | Open dialog for the patron with that hotkey letter |
+
+- Hotkey letters are assigned in order (`a`, `b`, `c`...) as patrons enter the bar
+- When a session terminates, its letter is freed and recycled for the next patron
+- The assigned letter appears as `(a) label` above each character's head
 
 ## Project Structure
 
 ```
 claude-punk/
-├── backend/              # Node.js backend
-│   ├── server.js         # Single-file entry point (Express + WebSocket + PTY)
+├── backend/                # Node.js backend
+│   ├── server.js           # Single-file entry point (Express + WebSocket + PTY)
 │   └── package.json
-├── frontend/             # Phaser.js + Vite frontend
+├── frontend/               # Phaser.js + Vite frontend
 │   ├── src/
-│   │   ├── main.js       # Phaser game bootstrap
-│   │   ├── scenes/       # Game scenes (bar, boot)
-│   │   ├── entities/     # Character sprites and behaviors
-│   │   ├── ui/           # HTML/CSS overlay panels
-│   │   ├── services/     # WebSocket client, state management
-│   │   ├── config/       # Game constants and configuration
-│   │   └── styles/       # CSS files
+│   │   ├── main.js         # Phaser game bootstrap
+│   │   ├── scenes/         # Game scenes (BarScene)
+│   │   ├── entities/       # Character, Bartender, DrinkManager
+│   │   ├── managers/       # HotkeyManager (keyboard shortcuts)
+│   │   ├── ui/             # HTML/CSS overlay panels
+│   │   │   ├── DialogBox.js
+│   │   │   ├── TerminalTab.js
+│   │   │   ├── FilesTab.js
+│   │   │   ├── FileEditor.js      # Monaco editor + rich preview
+│   │   │   ├── FileWarpPanel.js   # Terminal sidebar file tree
+│   │   │   ├── FolderPicker.js
+│   │   │   ├── Jukebox.js
+│   │   │   └── ClaudeConfigTab.js
+│   │   ├── services/       # WebSocket client, audio
+│   │   ├── config/         # Game constants and configuration
+│   │   └── styles/         # CSS files
 │   ├── index.html
 │   └── vite.config.js
-└── readme.md
+└── assets/                 # Game art (sprites, backgrounds)
 ```
 
 ## Tech Stack
 
 | Layer | Technology |
 |-------|-----------|
-| Game engine | Phaser 3 (640x360, pixel-perfect) |
+| Game engine | Phaser 3 (1920x1080, pixel-perfect scaling) |
 | Terminal UI | xterm.js |
+| Code editor | Monaco Editor |
+| Markdown preview | marked |
 | Frontend build | Vite |
 | Backend runtime | Node.js (ES modules) |
 | HTTP server | Express |
@@ -198,4 +224,4 @@ Make sure the backend is running on port 3000 before starting the frontend. Vite
 Kill the existing process or change the port: `PORT=3001 node server.js` (and update `vite.config.js` proxy target accordingly).
 
 ## dev team
-  - dev team agent created by [A-Team](https://github.com/chemistrywow31/A-Team) (Claude Code multi-agent system for team design) 
+  - dev team agent created by [A-Team](https://github.com/chemistrywow31/A-Team) (Claude Code multi-agent system for team design)

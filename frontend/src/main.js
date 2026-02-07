@@ -9,6 +9,7 @@ import DialogBox from './ui/DialogBox.js';
 import FolderPicker from './ui/FolderPicker.js';
 import VolumeControl from './ui/VolumeControl.js';
 import Jukebox from './ui/Jukebox.js';
+import HotkeyManager from './managers/HotkeyManager.js';
 import wsService from './services/websocket.js';
 import audioManager from './services/audioManager.js';
 
@@ -20,6 +21,8 @@ import './styles/terminal.css';
 import './styles/folder-picker.css';
 import './styles/volume-control.css';
 import './styles/jukebox.css';
+import './styles/file-warp.css';
+import './styles/file-editor.css';
 
 // ─── Game Configuration ─────────────────────────────────────────
 
@@ -55,6 +58,9 @@ game.events.on('ready', () => {
   scene.dialogBox = dialogBox;
   scene.folderPicker = folderPicker;
   scene.jukeboxUI = jukeboxUI;
+
+  // Hotkey manager — assigns letters to patrons, Ctrl+` closes overlays
+  scene.hotkeyManager = new HotkeyManager(scene, dialogBox, folderPicker, jukeboxUI);
 
   // Disable Phaser input when HTML overlays are visible (prevents click-through)
   folderPicker.onShow = () => { scene.input.enabled = false; };

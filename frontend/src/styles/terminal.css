@@ -1,6 +1,8 @@
 /* ─── Terminal Tab (xterm.js) ──────────────────────────────────── */
 
 .terminal-tab {
+  flex: 1;
+  min-width: 0;
   height: 100%;
   display: flex;
   flex-direction: column;

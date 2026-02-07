@@ -1230,6 +1230,11 @@ export default class BarScene extends Phaser.Scene {
     const meta = this.sessionMeta.get(sessionId);
     if (meta) meta.state = 'terminated';
 
+    // Free hotkey
+    if (this.hotkeyManager) {
+      this.hotkeyManager.free(sessionId);
+    }
+
     // Remove character
     patron.character.exit();
     patron.drinkManager.destroy();
@@ -1263,6 +1268,12 @@ export default class BarScene extends Phaser.Scene {
 
     const character = new Character(this, sessionId, seat, label || sessionId.slice(0, 8), agentType);
     character.create();
+
+    // Assign hotkey letter
+    if (this.hotkeyManager) {
+      const letter = this.hotkeyManager.assign(sessionId);
+      if (letter) character.setHotkey(letter);
+    }
 
     const drinkManager = new DrinkManager(this, character, seat);
 

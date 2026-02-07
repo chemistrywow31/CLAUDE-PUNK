@@ -60,12 +60,6 @@ export default class Jukebox {
       if (e.target === this.overlay) this.hide();
     });
 
-    // Escape to close
-    this._escHandler = (e) => {
-      if (e.key === 'Escape' && this.visible) this.hide();
-    };
-    document.addEventListener('keydown', this._escHandler);
-
     // Play/Pause
     this.panel.querySelector('.jukebox-play').addEventListener('click', () => {
       jukeboxAudio.togglePlayPause();

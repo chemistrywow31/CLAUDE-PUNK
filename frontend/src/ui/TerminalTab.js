@@ -9,6 +9,7 @@
 import { Terminal } from '@xterm/xterm';
 import { FitAddon } from '@xterm/addon-fit';
 import wsService from '../services/websocket.js';
+import FileWarpPanel from './FileWarpPanel.js';
 
 /** sessionId → TerminalTab  (survives dialog close / reopen) */
 const cache = new Map();
@@ -100,9 +101,19 @@ export default class TerminalTab {
    * Called by DialogBox each time the Terminal tab is shown.
    */
   render(container) {
+    // Wrapper: sidebar + terminal side by side
+    this.wrapper = document.createElement('div');
+    this.wrapper.className = 'terminal-with-sidebar';
+    container.appendChild(this.wrapper);
+
+    // File Warp sidebar
+    this.fileWarpPanel = new FileWarpPanel(this.sessionId);
+    this.fileWarpPanel.render(this.wrapper);
+
+    // Terminal container
     this.el = document.createElement('div');
     this.el.className = 'terminal-tab';
-    container.appendChild(this.el);
+    this.wrapper.appendChild(this.el);
 
     if (!this.initialized) {
       // First time: open xterm into the DOM
@@ -126,7 +137,7 @@ export default class TerminalTab {
       }
     });
 
-    // Watch for container resize
+    // Watch for terminal container resize (not the wrapper)
     if (this.resizeObserver) this.resizeObserver.disconnect();
     this.resizeObserver = new ResizeObserver(() => {
       try {
@@ -151,9 +162,14 @@ export default class TerminalTab {
       this.resizeObserver.disconnect();
       this.resizeObserver = null;
     }
-    if (this.el && this.el.parentNode) {
-      this.el.parentNode.removeChild(this.el);
+    if (this.fileWarpPanel) {
+      this.fileWarpPanel.destroy();
+      this.fileWarpPanel = null;
     }
+    if (this.wrapper && this.wrapper.parentNode) {
+      this.wrapper.parentNode.removeChild(this.wrapper);
+    }
+    this.wrapper = null;
     this.el = null;
   }
 
@@ -177,13 +193,18 @@ export default class TerminalTab {
       this.resizeObserver.disconnect();
       this.resizeObserver = null;
     }
+    if (this.fileWarpPanel) {
+      this.fileWarpPanel.destroy();
+      this.fileWarpPanel = null;
+    }
     if (this.term) {
       this.term.dispose();
       this.term = null;
     }
-    if (this.el && this.el.parentNode) {
-      this.el.parentNode.removeChild(this.el);
+    if (this.wrapper && this.wrapper.parentNode) {
+      this.wrapper.parentNode.removeChild(this.wrapper);
     }
+    this.wrapper = null;
     this.el = null;
     this.initialized = false;
   }
