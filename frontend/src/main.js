@@ -8,6 +8,7 @@ import BarScene from './scenes/BarScene.js';
 import DialogBox from './ui/DialogBox.js';
 import FolderPicker from './ui/FolderPicker.js';
 import VolumeControl from './ui/VolumeControl.js';
+import Jukebox from './ui/Jukebox.js';
 import wsService from './services/websocket.js';
 import audioManager from './services/audioManager.js';
 
@@ -18,6 +19,7 @@ import './styles/dialog.css';
 import './styles/terminal.css';
 import './styles/folder-picker.css';
 import './styles/volume-control.css';
+import './styles/jukebox.css';
 
 // ─── Game Configuration ─────────────────────────────────────────
 
@@ -47,16 +49,20 @@ game.events.on('ready', () => {
   // Initialize UI overlays
   const dialogBox = new DialogBox();
   const folderPicker = new FolderPicker();
+  const jukeboxUI = new Jukebox();
 
   // Wire overlays to scene
   scene.dialogBox = dialogBox;
   scene.folderPicker = folderPicker;
+  scene.jukeboxUI = jukeboxUI;
 
   // Disable Phaser input when HTML overlays are visible (prevents click-through)
   folderPicker.onShow = () => { scene.input.enabled = false; };
   folderPicker.onHide = () => { scene.input.enabled = true; };
   dialogBox.onOpen = () => { scene.input.enabled = false; };
   dialogBox.onClose = () => { scene.input.enabled = true; };
+  jukeboxUI.onShow = () => { scene.input.enabled = false; };
+  jukeboxUI.onHide = () => { scene.input.enabled = true; };
 
   // Connect WebSocket
   wsService.connect();

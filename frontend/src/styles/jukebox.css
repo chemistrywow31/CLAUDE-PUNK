@@ -1,0 +1,292 @@
+/* ─── Jukebox Overlay ─────────────────────────────────────────── */
+
+#jukebox-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0, 0, 0, 0.6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1002;
+}
+
+#jukebox-panel {
+  width: 400px;
+  max-width: 90vw;
+  max-height: 80vh;
+  display: flex;
+  flex-direction: column;
+  background: rgba(10, 10, 20, 0.95);
+  border: 1px solid var(--accent-pink);
+  box-shadow:
+    0 0 10px rgba(255, 0, 128, 0.3),
+    inset 0 0 20px rgba(255, 0, 128, 0.05);
+  position: relative;
+}
+
+/* Corner accents (pink theme) */
+#jukebox-panel::before,
+#jukebox-panel::after {
+  content: '';
+  position: absolute;
+  width: 8px;
+  height: 8px;
+  border-color: var(--accent-pink);
+  border-style: solid;
+}
+
+#jukebox-panel::before {
+  top: -1px;
+  left: -1px;
+  border-width: 2px 0 0 2px;
+}
+
+#jukebox-panel::after {
+  bottom: -1px;
+  right: -1px;
+  border-width: 0 2px 2px 0;
+}
+
+/* ─── Header ──────────────────────────────────────────────────── */
+
+.jukebox-header {
+  display: flex;
+  align-items: center;
+  padding: 10px 16px;
+  border-bottom: 1px solid rgba(255, 0, 128, 0.2);
+}
+
+.jukebox-title {
+  font-family: var(--font-ui);
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--accent-pink);
+  flex: 1;
+  text-transform: uppercase;
+  letter-spacing: 2px;
+}
+
+.jukebox-close {
+  background: none;
+  border: 1px solid var(--text-secondary);
+  color: var(--text-secondary);
+  font-size: 18px;
+  width: 28px;
+  height: 28px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.15s;
+}
+
+.jukebox-close:hover {
+  border-color: var(--accent-pink);
+  color: var(--accent-pink);
+  box-shadow: 0 0 8px rgba(255, 0, 128, 0.3);
+}
+
+/* ─── Now Playing ────────────────────────────────────────────── */
+
+.jukebox-now-playing {
+  padding: 8px 16px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--text-secondary);
+  border-bottom: 1px solid rgba(255, 0, 128, 0.1);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.jukebox-now-playing .track-name {
+  color: var(--accent-pink);
+}
+
+/* ─── Controls ───────────────────────────────────────────────── */
+
+.jukebox-controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 16px;
+  border-bottom: 1px solid rgba(255, 0, 128, 0.1);
+}
+
+.jukebox-btn {
+  background: none;
+  border: 1px solid var(--text-secondary);
+  color: var(--text-secondary);
+  font-family: var(--font-mono);
+  font-size: 14px;
+  width: 32px;
+  height: 32px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.15s;
+}
+
+.jukebox-btn:hover {
+  border-color: var(--accent-pink);
+  color: var(--accent-pink);
+  box-shadow: 0 0 6px rgba(255, 0, 128, 0.2);
+}
+
+.jukebox-btn.active {
+  border-color: var(--accent-pink);
+  color: var(--accent-pink);
+}
+
+.jukebox-volume {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.jukebox-volume label {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--text-secondary);
+}
+
+.jukebox-volume input[type="range"] {
+  flex: 1;
+  height: 4px;
+  -webkit-appearance: none;
+  appearance: none;
+  background: var(--bg-panel);
+  border: 1px solid var(--text-secondary);
+  outline: none;
+  cursor: pointer;
+}
+
+.jukebox-volume input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 10px;
+  height: 10px;
+  background: var(--accent-pink);
+  border: none;
+  cursor: pointer;
+}
+
+.jukebox-volume input[type="range"]::-moz-range-thumb {
+  width: 10px;
+  height: 10px;
+  background: var(--accent-pink);
+  border: none;
+  cursor: pointer;
+}
+
+/* ─── Upload ─────────────────────────────────────────────────── */
+
+.jukebox-upload {
+  padding: 8px 16px;
+  border-bottom: 1px solid rgba(255, 0, 128, 0.1);
+}
+
+.jukebox-upload-btn {
+  font-family: var(--font-ui);
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--bg-primary);
+  background: var(--accent-pink);
+  border: none;
+  padding: 6px 16px;
+  cursor: pointer;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  transition: all 0.15s;
+  width: 100%;
+}
+
+.jukebox-upload-btn:hover {
+  background: #ff44aa;
+  box-shadow: 0 0 10px rgba(255, 0, 128, 0.5);
+}
+
+/* ─── Playlist ───────────────────────────────────────────────── */
+
+.jukebox-playlist {
+  flex: 1;
+  overflow-y: auto;
+  min-height: 100px;
+  max-height: 300px;
+}
+
+.jukebox-playlist-empty {
+  color: var(--text-secondary);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  padding: 24px 16px;
+  text-align: center;
+}
+
+.jukebox-track {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 16px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--text-primary);
+  cursor: pointer;
+  transition: background 0.1s;
+}
+
+.jukebox-track:hover {
+  background: rgba(255, 0, 128, 0.08);
+}
+
+.jukebox-track.playing {
+  color: var(--accent-pink);
+  background: rgba(255, 0, 128, 0.05);
+}
+
+.jukebox-track .track-index {
+  color: var(--text-secondary);
+  width: 20px;
+  text-align: right;
+  flex-shrink: 0;
+}
+
+.jukebox-track.playing .track-index {
+  color: var(--accent-pink);
+}
+
+.jukebox-track .track-name {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.jukebox-track-actions {
+  display: flex;
+  gap: 2px;
+  flex-shrink: 0;
+}
+
+.jukebox-track-actions button {
+  background: none;
+  border: none;
+  color: var(--text-secondary);
+  font-size: 12px;
+  width: 22px;
+  height: 22px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: color 0.1s;
+}
+
+.jukebox-track-actions button:hover {
+  color: var(--accent-pink);
+}

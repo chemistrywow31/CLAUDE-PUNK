@@ -20,6 +20,7 @@ import DrinkManager from '../entities/DrinkManager.js';
 import Bartender from '../entities/Bartender.js';
 import TerminalTab from '../ui/TerminalTab.js';
 import wsService from '../services/websocket.js';
+import jukeboxAudio from '../services/jukeboxAudio.js';
 
 export default class BarScene extends Phaser.Scene {
   constructor() {
@@ -34,6 +35,7 @@ export default class BarScene extends Phaser.Scene {
     // UI references (set by main.js)
     this.folderPicker = null;
     this.dialogBox = null;
+    this.jukeboxUI = null;
 
     // Session metadata
     this.sessionMeta = new Map();
@@ -42,6 +44,7 @@ export default class BarScene extends Phaser.Scene {
   preload() {
     this.load.image('bar-bg', '/assets/backgrounds/bar-interior.png');
     this.load.image('door', '/assets/sprites/objects/door.png');
+    this.load.atlas('jukebox', '/assets/sprites/objects/jukebox.png', '/assets/sprites/objects/jukebox.json');
     this.load.atlas('character-0', '/assets/sprites/characters/character-0.png', '/assets/sprites/characters/character-0.json');
     this.load.atlas('character-1', '/assets/sprites/characters/character-1.png', '/assets/sprites/characters/character-1.json');
     this.load.atlas('character-2', '/assets/sprites/characters/character-2.png', '/assets/sprites/characters/character-2.json');
@@ -61,6 +64,7 @@ export default class BarScene extends Phaser.Scene {
     }
     this.createBartender();
     this.drawDoor();
+    this.drawJukebox();
     this.drawNeonSigns();
     this.setupWebSocketListeners();
   }
@@ -92,6 +96,13 @@ export default class BarScene extends Phaser.Scene {
     // Door texture
     if (!this.textures.exists('door')) {
       this.generateDoorTexture();
+    }
+
+    // Jukebox texture — check frameTotal to detect failed atlas loads
+    const jbTex = this.textures.exists('jukebox') ? this.textures.get('jukebox') : null;
+    if (!jbTex || jbTex.frameTotal <= 2) {
+      if (jbTex) this.textures.remove('jukebox');
+      this.generateJukeboxTexture();
     }
   }
 
@@ -201,6 +212,91 @@ export default class BarScene extends Phaser.Scene {
 
     g.generateTexture('door', 120, 240);
     g.destroy();
+  }
+
+  generateJukeboxTexture() {
+    const g = this.make.graphics({ x: 0, y: 0, add: false });
+    const fw = 56;  // frame width
+    const fh = 96;  // frame height
+
+    // Equalizer bar patterns per frame (7 bars, heights in pixels from bottom of display)
+    // Frame 0: idle/off — all bars dim and low
+    // Frame 1-3: playing — different wave patterns for animation
+    const eqPatterns = [
+      [4, 6, 4, 6, 4, 6, 4],      // idle: low flat bars
+      [8, 20, 12, 24, 10, 18, 6],  // wave A: rising peak center-right
+      [14, 10, 22, 8, 24, 12, 16], // wave B: peaks shift
+      [6, 18, 10, 16, 8, 22, 14],  // wave C: peaks move left
+    ];
+
+    const eqColors = [0xff0080, 0x00f0ff, 0xffaa00, 0xff0080, 0x00f0ff, 0xffaa00, 0xff0080];
+
+    for (let frame = 0; frame < 4; frame++) {
+      const ox = frame * fw;
+
+      // Cabinet body
+      g.fillStyle(0x2a2a3a);
+      g.fillRect(ox + 4, 16, 48, 76);
+
+      // Dome top
+      g.fillStyle(0x3a3a4e);
+      g.fillRect(ox + 8, 4, 40, 16);
+      g.fillRect(ox + 12, 0, 32, 8);
+
+      // Display window background
+      g.fillStyle(0x0a0a14);
+      g.fillRect(ox + 8, 20, 40, 32);
+
+      // Equalizer bars inside display
+      const bars = eqPatterns[frame];
+      const barW = 4;
+      const barGap = 2;
+      const barStartX = ox + 10;
+      const barBottomY = 50; // bottom of display area
+      bars.forEach((h, i) => {
+        const bx = barStartX + i * (barW + barGap);
+        const alpha = frame === 0 ? 0.3 : 0.85;
+        g.fillStyle(eqColors[i], alpha);
+        g.fillRect(bx, barBottomY - h, barW, h);
+        // Bright tip pixel
+        if (frame > 0) {
+          g.fillStyle(0xe0e0e0, 0.9);
+          g.fillRect(bx, barBottomY - h, barW, 2);
+        }
+      });
+
+      // Speaker grille
+      g.fillStyle(0x1a1a2e);
+      g.fillRect(ox + 8, 56, 40, 24);
+      for (let i = 0; i < 4; i++) {
+        g.fillStyle(0x2a2a3a);
+        g.fillRect(ox + 12, 58 + i * 5, 32, 2);
+      }
+
+      // Base
+      g.fillStyle(0x4a4a5e);
+      g.fillRect(ox + 4, 84, 48, 12);
+
+      // Neon border (pink)
+      g.lineStyle(1, 0xff0080, frame === 0 ? 0.4 : 0.8);
+      g.strokeRect(ox + 4, 16, 48, 76);
+
+      // Top neon accent (cyan)
+      g.lineStyle(1, 0x00f0ff, frame === 0 ? 0.3 : 0.6);
+      g.strokeRect(ox + 8, 4, 40, 16);
+    }
+
+    // Render to a temporary texture, then create a proper spritesheet from it
+    const tmpKey = '__jukebox_tmp';
+    g.generateTexture(tmpKey, fw * 4, fh);
+    g.destroy();
+
+    const source = this.textures.get(tmpKey).getSourceImage();
+    this.textures.addSpriteSheet('jukebox', source, {
+      frameWidth: fw,
+      frameHeight: fh,
+    });
+    this.textures.remove(tmpKey);
   }
 
   // --- Scene Drawing --------------------------------------------------
@@ -651,6 +747,63 @@ export default class BarScene extends Phaser.Scene {
     });
   }
 
+  drawJukebox() {
+    const jbX = 245;
+    const jbY = 920;
+
+    const jukebox = this.add.sprite(jbX, jbY, 'jukebox', 0);
+    jukebox.setOrigin(0.5, 1);
+    jukebox.setScale(3.5);
+    jukebox.setDepth(5);
+    jukebox.setInteractive({ useHandCursor: true });
+
+    // Neon glow layers (pink accent, matching jukebox theme)
+    const glowG = this.add.graphics();
+    glowG.setDepth(4);
+    glowG.fillStyle(0xff0080, 0.06);
+    glowG.fillCircle(jbX, jbY - 168, 180);
+    glowG.fillStyle(0x00f0ff, 0.03);
+    glowG.fillCircle(jbX, jbY - 168, 120);
+
+    // Equalizer animation — cycle frames 1-3 when playing, frame 0 when idle
+    let eqFrame = 1;
+    this.time.addEvent({
+      delay: 250,
+      loop: true,
+      callback: () => {
+        if (jukebox.active === false) return;
+        if (jukeboxAudio.playing) {
+          jukebox.setFrame(eqFrame);
+          eqFrame = eqFrame >= 3 ? 1 : eqFrame + 1;
+        } else {
+          jukebox.setFrame(0);
+          eqFrame = 1;
+        }
+      },
+    });
+
+    // Hover effect
+    jukebox.on('pointerover', () => jukebox.setTint(0xff44aa));
+    jukebox.on('pointerout', () => jukebox.clearTint());
+
+    // Click to open jukebox UI
+    jukebox.on('pointerdown', () => {
+      if (this.jukeboxUI) this.jukeboxUI.toggle();
+    });
+
+    // Small label under jukebox
+    const label = this.add.text(jbX, jbY + 6, 'JUKEBOX', {
+      fontSize: '15px',
+      fontFamily: 'Rajdhani, sans-serif',
+      fontStyle: 'bold',
+      color: '#ff0080',
+      stroke: '#0a0a14',
+      strokeThickness: 4,
+    });
+    label.setOrigin(0.5, 0);
+    label.setDepth(15);
+  }
+
   drawNeonSigns() {
     // -- "CLAUDE PUNK" neon sign -- isometric tilt matching 2.5D perspective --
     // The sign is mounted on the back wall which has a slight angle,
@@ -797,6 +950,22 @@ export default class BarScene extends Phaser.Scene {
     subGlow._baseAlpha = 0.2;
     subCore._baseAlpha = 1;
     this.createSignFlicker([subGlow, subCore]);
+
+    // -- Agent type legend --
+    const legendY = 1002;
+    const claudeLabel = this.add.text(30, legendY, '● claude', {
+      fontSize: '18px',
+      fontFamily: 'JetBrains Mono, monospace',
+      color: '#ffaa00',
+    });
+    claudeLabel.setDepth(20);
+
+    const codexLabel = this.add.text(30 + claudeLabel.width + 24, legendY, '● codex', {
+      fontSize: '18px',
+      fontFamily: 'JetBrains Mono, monospace',
+      color: '#00a0ff',
+    });
+    codexLabel.setDepth(20);
 
     // -- Connection status indicator --
     this.connectionText = this.add.text(30, 1050, '● OFFLINE', {

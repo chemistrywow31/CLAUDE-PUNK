@@ -380,6 +380,64 @@ Strict pixel art, no anti-aliasing. Transparent background outside the plate.
 
 ---
 
+## 8. Jukebox Sprite Sheet (4 frames)
+
+**File**: `assets/sprites/objects/jukebox.png`
+**Dimensions**: 224x96 pixels total (4 frames of 56x96 each, horizontal strip)
+**Format**: PNG with alpha
+
+The jukebox has 4 frames — the game cycles through frames 2-4 when music is
+playing to animate the equalizer, and shows frame 1 when idle.
+
+- **Frame 1 (Idle/Off)**: Equalizer bars are dim and low, neon outline faint
+- **Frame 2 (Playing A)**: Bars rise in a wave pattern peaking center-right
+- **Frame 3 (Playing B)**: Bars shift — peaks move to different positions
+- **Frame 4 (Playing C)**: Bars shift again — peaks swing to the left side
+
+**Prompt**:
+```
+Pixel art sprite sheet, 224x96 pixels total, 4 frames of 56x96 each, horizontal
+strip. Cyberpunk jukebox machine, front view. Classic arcade jukebox form factor
+— domed/arched top, wide cabinet body, speaker grille on the lower half.
+
+CABINET DESIGN (same across all 4 frames):
+- Cabinet body: dark metal (#2a2a3a) with gray metallic trim (#4a4a5e)
+- Arched top section: darker panel (#3a3a4e) with a rounded crown
+- Display window (upper half): dark glass (#0a0a14) — this is where the
+  equalizer bars are drawn (see below)
+- Speaker grille (lower half): dark recessed area (#1a1a2e) with horizontal
+  slat lines (#2a2a3a) for texture
+- Base: solid gray metal (#4a4a5e), slightly wider than the body
+- Neon pink (#ff0080) 1-pixel outline around the cabinet body
+- Cyan (#00f0ff) 1-pixel accent on the arched top
+
+EQUALIZER BARS (the key difference between frames):
+Inside the display window, draw 7 vertical bars side by side. Each bar is 4px
+wide with 2px gap between them. Bar colors alternate: pink (#ff0080), cyan
+(#00f0ff), amber (#ffaa00), repeating. Each bar has a bright white (#e0e0e0)
+tip (top 2px). The bars grow upward from the bottom of the display window.
+
+Frame 1 (Idle): All bars short (4-6px), dim (low opacity ~30%), no bright tips.
+  The neon outline is also dimmer (faint pink, faint cyan).
+Frame 2 (Playing A): Bar heights: 8, 20, 12, 24, 10, 18, 6 — a wave peaking
+  toward the right. Bars are bright (85% opacity), white tips visible.
+Frame 3 (Playing B): Bar heights: 14, 10, 22, 8, 24, 12, 16 — peaks shift
+  position. Different wave shape from frame 2.
+Frame 4 (Playing C): Bar heights: 6, 18, 10, 16, 8, 22, 14 — peaks swing
+  left. Creates a flowing wave animation when frames 2-4 cycle.
+
+GLOW: The jukebox emits a subtle pink neon aura. Add 1-2 extra bright pixels
+around the edges to suggest glow, NOT blur or gradients.
+
+Style: strict pixel art, no anti-aliasing, no gradients, no blur.
+Transparent background (alpha channel). References: retro Wurlitzer jukebox
+meets cyberpunk neon aesthetic, like a VA-11 Hall-A prop.
+```
+
+**Post-processing**: Replace solid black (#000000) background with transparency. Final dimensions must be exactly 224x96 (4 frames x 56x96).
+
+---
+
 ## 9. Background Music (Suno) — 4 Tracks
 
 The game randomly shuffles and plays these 4 tracks in sequence.
@@ -475,6 +533,7 @@ convert assets/sprites/characters/character-0.png -unique-colors txt: | wc -l
 | Character 2 (pink) | `assets/sprites/characters/character-2.png` + `.json` |
 | Character 3 (amber) | `assets/sprites/characters/character-3.png` + `.json` |
 | Door | `assets/sprites/objects/door.png` |
+| Jukebox | `assets/sprites/objects/jukebox.png` |
 | Drinks | `assets/sprites/objects/drinks.png` + `.json` |
 | Walk cycle (opt.) | `assets/sprites/characters/character-walk.png` |
 | Neon sign | `assets/sprites/ui/neon-sign-main.png` |

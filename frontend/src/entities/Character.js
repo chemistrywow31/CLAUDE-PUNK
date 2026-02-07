@@ -18,7 +18,6 @@ export default class Character {
     this.agentType = agentType;
     this.sprite = null;
     this.nameText = null;
-    this.agentBadge = null;
     this.currentPose = POSE.IDLE;
     this.poseTimer = null;
     this.isWalking = false;
@@ -39,11 +38,12 @@ export default class Character {
     this.sprite.setDepth(10);
     this.sprite.setAlpha(0);
 
-    // Name label above character
+    // Name label above character (colored by agent type)
+    const nameColor = this.agentType === 'codex' ? '#00a0ff' : '#ffaa00';
     this.nameText = this.scene.add.text(DOOR_POSITION.x, DOOR_POSITION.y - 204, this.label, {
       fontSize: '24px',
       fontFamily: 'Rajdhani, sans-serif',
-      color: '#00f0ff',
+      color: nameColor,
       stroke: '#0a0a14',
       strokeThickness: 6,
     });
@@ -51,24 +51,9 @@ export default class Character {
     this.nameText.setDepth(15);
     this.nameText.setAlpha(0);
 
-    // Agent type badge below name
-    const badgeColor = this.agentType === 'codex' ? '#00a0ff' : '#ffaa00';
-    const badgeLabel = this.agentType === 'codex' ? 'CODEX' : 'CLAUDE';
-    this.agentBadge = this.scene.add.text(DOOR_POSITION.x, DOOR_POSITION.y - 180, badgeLabel, {
-      fontSize: '14px',
-      fontFamily: 'JetBrains Mono, monospace',
-      fontStyle: 'bold',
-      color: badgeColor,
-      stroke: '#0a0a14',
-      strokeThickness: 4,
-    });
-    this.agentBadge.setOrigin(0.5, 1);
-    this.agentBadge.setDepth(15);
-    this.agentBadge.setAlpha(0);
-
     // Entrance: fade in at door
     this.scene.tweens.add({
-      targets: [this.sprite, this.nameText, this.agentBadge],
+      targets: [this.sprite, this.nameText],
       alpha: 1,
       scale: { from: 0.5, to: 1.5 },
       duration: 300,
@@ -114,14 +99,6 @@ export default class Character {
       onComplete: () => {
         this.onSeated();
       },
-    });
-
-    this.scene.tweens.add({
-      targets: this.agentBadge,
-      x: this.seat.x,
-      y: this.seat.y - 180,
-      duration: Math.max(duration, 400),
-      ease: 'Power1',
     });
   }
 
@@ -249,13 +226,12 @@ export default class Character {
     if (this.sprite) {
       this.sprite.disableInteractive();
       this.scene.tweens.add({
-        targets: [this.sprite, this.nameText, this.agentBadge].filter(Boolean),
+        targets: [this.sprite, this.nameText].filter(Boolean),
         alpha: 0,
         duration: 500,
         onComplete: () => {
           this.sprite.destroy();
           if (this.nameText) this.nameText.destroy();
-          if (this.agentBadge) this.agentBadge.destroy();
         },
       });
     }
