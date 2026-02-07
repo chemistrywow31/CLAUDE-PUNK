@@ -6,7 +6,7 @@
  * Characters randomly switch poses every 3-8 seconds for liveliness.
  */
 
-import { POSE, CHARACTER_POSES, POSE_MIN_DURATION, POSE_MAX_DURATION, WALK_SPEED } from '../config/animations.js';
+import { POSE, CHARACTER_POSES, POSE_MIN_DURATION, POSE_MAX_DURATION, WALK_SPEED, CHARACTER_VARIANT_COUNT } from '../config/animations.js';
 import { DOOR_POSITION } from '../config/seats.js';
 
 export default class Character {
@@ -25,7 +25,7 @@ export default class Character {
     this.destroyed = false;
 
     // Pick a random character variant (for visual diversity)
-    this.variant = Phaser.Math.Between(0, 3);
+    this.variant = Phaser.Math.Between(0, CHARACTER_VARIANT_COUNT - 1);
   }
 
   create() {

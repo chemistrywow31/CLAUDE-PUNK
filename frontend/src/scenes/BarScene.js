@@ -45,10 +45,9 @@ export default class BarScene extends Phaser.Scene {
     this.load.image('bar-bg', '/assets/backgrounds/bar-interior.png');
     this.load.image('door', '/assets/sprites/objects/door.png');
     this.load.atlas('jukebox', '/assets/sprites/objects/jukebox.png', '/assets/sprites/objects/jukebox.json');
-    this.load.atlas('character-0', '/assets/sprites/characters/character-0.png', '/assets/sprites/characters/character-0.json');
-    this.load.atlas('character-1', '/assets/sprites/characters/character-1.png', '/assets/sprites/characters/character-1.json');
-    this.load.atlas('character-2', '/assets/sprites/characters/character-2.png', '/assets/sprites/characters/character-2.json');
-    this.load.atlas('character-3', '/assets/sprites/characters/character-3.png', '/assets/sprites/characters/character-3.json');
+    for (let i = 0; i < 8; i++) {
+      this.load.atlas(`character-${i}`, `/assets/sprites/characters/character-${i}.png`, `/assets/sprites/characters/character-${i}.json`);
+    }
     this.load.atlas('bartender', '/assets/sprites/characters/bartender.png', '/assets/sprites/characters/bartender.json');
     this.load.atlas('drinks', '/assets/sprites/objects/drinks.png', '/assets/sprites/objects/drinks.json');
     this.load.image('neon-sign', '/assets/sprites/ui/neon-sign-main.png');
@@ -72,13 +71,17 @@ export default class BarScene extends Phaser.Scene {
   // --- Placeholder Texture Generation ---------------------------------
 
   generatePlaceholderTextures() {
-    // Character variants (4 different color schemes)
+    // Character variants (8 different color schemes)
     // Skip if real atlas was loaded in preload()
     const charColors = [
       { body: 0x2a2a3a, hair: 0x8040c0, skin: 0xd4a574 },
       { body: 0x2a3a2a, hair: 0x00f0ff, skin: 0xd4a574 },
       { body: 0x3a2a2a, hair: 0xff0080, skin: 0xc49464 },
       { body: 0x2a2a4a, hair: 0xffaa00, skin: 0xb48454 },
+      { body: 0x3a2a3a, hair: 0x40c080, skin: 0xd4a574 },
+      { body: 0x2a2a2a, hair: 0xf04040, skin: 0xc49464 },
+      { body: 0x3a3a2a, hair: 0x6060ff, skin: 0xb48454 },
+      { body: 0x2a3a3a, hair: 0xe0e0e0, skin: 0xd4a574 },
     ];
 
     charColors.forEach((colors, i) => {

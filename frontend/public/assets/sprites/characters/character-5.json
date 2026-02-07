@@ -1,6 +1,6 @@
 {
   "frames": {
-    "char-idle-3": {
+    "char-idle-5": {
       "frame": {
         "x": 0,
         "y": 0,
@@ -8,7 +8,7 @@
         "h": 192
       }
     },
-    "char-drink-3": {
+    "char-drink-5": {
       "frame": {
         "x": 96,
         "y": 0,
@@ -16,7 +16,7 @@
         "h": 192
       }
     },
-    "char-lean-3": {
+    "char-lean-5": {
       "frame": {
         "x": 192,
         "y": 0,
@@ -24,7 +24,7 @@
         "h": 192
       }
     },
-    "char-look-3": {
+    "char-look-5": {
       "frame": {
         "x": 288,
         "y": 0,
@@ -34,7 +34,7 @@
     }
   },
   "meta": {
-    "image": "character-3.png",
+    "image": "character-5.png",
     "size": {
       "w": 384,
       "h": 192

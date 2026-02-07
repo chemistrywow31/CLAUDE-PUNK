@@ -20,6 +20,7 @@ export default class FolderPicker {
     this.loading = false;
     this._onBrowseResult = null;
     this._onBrowseError = null;
+    this._labelManuallyEdited = false;
     this.init();
   }
 
@@ -110,6 +111,9 @@ export default class FolderPicker {
     });
 
     const labelInput = this.overlay.querySelector('#fp-label');
+    labelInput.addEventListener('input', () => {
+      this._labelManuallyEdited = true;
+    });
     labelInput.addEventListener('keydown', (e) => {
       if (e.key === 'Enter') this.submit();
       if (e.key === 'Escape') this.hide();
@@ -119,6 +123,7 @@ export default class FolderPicker {
   show() {
     this.overlay.classList.remove('hidden');
     this.visible = true;
+    this._labelManuallyEdited = false;
     this.clearError();
     if (this.onShow) this.onShow();
 
@@ -183,9 +188,9 @@ export default class FolderPicker {
     // Update path input
     this.overlay.querySelector('#fp-path').value = payload.path;
 
-    // Auto-fill label from folder name if empty
+    // Auto-fill label from folder name (always sync unless user manually edited)
     const labelInput = this.overlay.querySelector('#fp-label');
-    if (!labelInput.value.trim()) {
+    if (!this._labelManuallyEdited) {
       labelInput.value = payload.path.split('/').pop() || '';
     }
 

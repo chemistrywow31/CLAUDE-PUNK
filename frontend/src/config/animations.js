@@ -14,29 +14,33 @@ export const POSE = {
 // All available poses — the character randomly switches between these
 export const CHARACTER_POSES = [POSE.IDLE, POSE.DRINKING, POSE.LEANING, POSE.LOOKING];
 
+// Total number of character variants
+export const CHARACTER_VARIANT_COUNT = 8;
+
 // Animation definitions (used when real sprite sheets are loaded)
+const variantIndices = Array.from({ length: CHARACTER_VARIANT_COUNT }, (_, i) => i);
 export const ANIMATION_DEFS = [
   {
     key: POSE.IDLE,
-    frames: ['char-idle-0', 'char-idle-1', 'char-idle-2', 'char-idle-3'],
+    frames: variantIndices.map((i) => `char-idle-${i}`),
     frameRate: 2,
     repeat: -1,
   },
   {
     key: POSE.DRINKING,
-    frames: ['char-drink-0', 'char-drink-1', 'char-drink-2', 'char-drink-3'],
+    frames: variantIndices.map((i) => `char-drink-${i}`),
     frameRate: 4,
     repeat: 0,
   },
   {
     key: POSE.LEANING,
-    frames: ['char-lean-0', 'char-lean-1', 'char-lean-2', 'char-lean-3'],
+    frames: variantIndices.map((i) => `char-lean-${i}`),
     frameRate: 2,
     repeat: -1,
   },
   {
     key: POSE.LOOKING,
-    frames: ['char-look-0', 'char-look-1', 'char-look-2', 'char-look-3'],
+    frames: variantIndices.map((i) => `char-look-${i}`),
     frameRate: 3,
     repeat: 0,
   },

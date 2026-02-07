@@ -120,12 +120,16 @@ CRITICAL STYLE RULES:
 
 ---
 
-## 2. Character Sprite Sheets (4 variants)
+## 2. Character Sprite Sheets (8 variants)
 
-Each character has 4 frames arranged horizontally for 4 sitting poses:
+Each character has 4 frames arranged horizontally for 4 sitting poses.
+**IMPORTANT**: Characters must be drawn as CHARACTER ONLY — no chairs, stools,
+tables, or any furniture. The background already contains all furniture.
+The character should appear to be in a sitting pose but with nothing underneath them.
+
 - Frame 0: **Idle sitting** — relaxed posture, looking forward
 - Frame 1: **Drinking** — arm raised with glass near mouth
-- Frame 2: **Leaning** — leaning on arm/table, casual pose
+- Frame 2: **Leaning** — leaning on arm, casual pose
 - Frame 3: **Looking around** — head turned slightly, curious expression
 
 ### Character Variant 0 (Purple Hair)
@@ -137,7 +141,8 @@ Each character has 4 frames arranged horizontally for 4 sitting poses:
 **Prompt**:
 ```
 Pixel art sprite sheet, 128x64 pixels total, 4 frames of 32x64 each, horizontal strip.
-Cyberpunk chibi character sitting on a stool/chair. Large head (~40% body height).
+Cyberpunk chibi character in sitting pose, CHARACTER ONLY — NO chair, NO stool,
+NO table, NO furniture of any kind. Large head (~40% body height).
 Purple hair (#8040c0), light skin (#d4a574), dark jacket (#2a2a3a).
 White eyes on dark face.
 Frame 1: sitting idle, arms resting. Frame 2: drinking from glowing glass,
@@ -155,7 +160,8 @@ Dark background transparent (alpha channel).
 **Prompt**:
 ```
 Pixel art sprite sheet, 128x64 pixels total, 4 frames of 32x64 each, horizontal strip.
-Cyberpunk chibi character sitting on a stool/chair. Large head (~40% body height).
+Cyberpunk chibi character in sitting pose, CHARACTER ONLY — NO chair, NO stool,
+NO table, NO furniture. Large head (~40% body height).
 Bright cyan hair (#00f0ff), light skin (#d4a574), dark green-tinted jacket (#2a3a2a).
 White eyes on dark face.
 Frame 1: sitting idle. Frame 2: drinking from neon cocktail.
@@ -172,10 +178,11 @@ Style: strict pixel art, no anti-aliasing, transparent background.
 **Prompt**:
 ```
 Pixel art sprite sheet, 128x64 pixels total, 4 frames of 32x64 each, horizontal strip.
-Cyberpunk chibi character sitting. Large head (~40% body height).
+Cyberpunk chibi character in sitting pose, CHARACTER ONLY — NO chair, NO stool,
+NO table, NO furniture. Large head (~40% body height).
 Neon pink hair (#ff0080), slightly darker skin (#c49464), dark red-tinted jacket (#3a2a2a).
 Frame 1: idle sitting. Frame 2: sipping from glowing cocktail.
-Frame 3: leaning forward on table. Frame 4: turning head to look at something.
+Frame 3: leaning forward, relaxed. Frame 4: turning head to look at something.
 Strict pixel art, no smoothing, transparent background.
 ```
 
@@ -188,24 +195,93 @@ Strict pixel art, no smoothing, transparent background.
 **Prompt**:
 ```
 Pixel art sprite sheet, 128x64 pixels total, 4 frames of 32x64 each, horizontal strip.
-Cyberpunk chibi character sitting. Large head (~40% body height).
+Cyberpunk chibi character in sitting pose, CHARACTER ONLY — NO chair, NO stool,
+NO table, NO furniture. Large head (~40% body height).
 Warm amber/gold hair (#ffaa00), warm skin (#b48454), dark blue-tinted jacket (#2a2a4a).
 Frame 1: sitting relaxed. Frame 2: drinking neon cocktail.
 Frame 3: leaning on arm, looking content. Frame 4: glancing around the bar.
 Strict pixel art, no anti-aliasing, transparent background.
 ```
 
-### Atlas JSON Template (same for all 4 variants)
+### Character Variant 4 (Green Hair)
 
-Place this as `character-{N}.json` next to each PNG:
+**File**: `assets/sprites/characters/character-4.png`
+**Atlas**: `assets/sprites/characters/character-4.json`
+**Dimensions**: 128x64 pixels
+
+**Prompt**:
+```
+Pixel art sprite sheet, 128x64 pixels total, 4 frames of 32x64 each, horizontal strip.
+Cyberpunk chibi character in sitting pose, CHARACTER ONLY — NO chair, NO stool,
+NO table, NO furniture. Large head (~40% body height).
+Bright green hair (#40c080), light skin (#d4a574), dark purple-tinted jacket (#3a2a3a).
+Frame 1: sitting idle, relaxed. Frame 2: raising a neon cocktail to drink.
+Frame 3: leaning sideways on one arm. Frame 4: head turned, scanning the room.
+Strict pixel art, no anti-aliasing, transparent background.
+```
+
+### Character Variant 5 (Red Hair)
+
+**File**: `assets/sprites/characters/character-5.png`
+**Atlas**: `assets/sprites/characters/character-5.json`
+**Dimensions**: 128x64 pixels
+
+**Prompt**:
+```
+Pixel art sprite sheet, 128x64 pixels total, 4 frames of 32x64 each, horizontal strip.
+Cyberpunk chibi character in sitting pose, CHARACTER ONLY — NO chair, NO stool,
+NO table, NO furniture. Large head (~40% body height).
+Fiery red hair (#f04040), slightly darker skin (#c49464), dark charcoal jacket (#2a2a2a).
+Frame 1: sitting idle, arms resting. Frame 2: sipping from a glowing glass.
+Frame 3: leaning back casually. Frame 4: looking around with curiosity.
+Strict pixel art, no anti-aliasing, transparent background.
+```
+
+### Character Variant 6 (Blue Hair)
+
+**File**: `assets/sprites/characters/character-6.png`
+**Atlas**: `assets/sprites/characters/character-6.json`
+**Dimensions**: 128x64 pixels
+
+**Prompt**:
+```
+Pixel art sprite sheet, 128x64 pixels total, 4 frames of 32x64 each, horizontal strip.
+Cyberpunk chibi character in sitting pose, CHARACTER ONLY — NO chair, NO stool,
+NO table, NO furniture. Large head (~40% body height).
+Electric blue hair (#6060ff), warm skin (#b48454), dark olive-tinted jacket (#3a3a2a).
+Frame 1: sitting idle. Frame 2: drinking from glowing cocktail.
+Frame 3: leaning forward on one arm. Frame 4: head turned, watching something.
+Strict pixel art, no anti-aliasing, transparent background.
+```
+
+### Character Variant 7 (Silver/White Hair)
+
+**File**: `assets/sprites/characters/character-7.png`
+**Atlas**: `assets/sprites/characters/character-7.json`
+**Dimensions**: 128x64 pixels
+
+**Prompt**:
+```
+Pixel art sprite sheet, 128x64 pixels total, 4 frames of 32x64 each, horizontal strip.
+Cyberpunk chibi character in sitting pose, CHARACTER ONLY — NO chair, NO stool,
+NO table, NO furniture. Large head (~40% body height).
+Silver/white hair (#e0e0e0), light skin (#d4a574), dark teal-tinted jacket (#2a3a3a).
+Frame 1: sitting idle, calm expression. Frame 2: raising glowing drink.
+Frame 3: leaning to one side, relaxed. Frame 4: looking sideways curiously.
+Strict pixel art, no anti-aliasing, transparent background.
+```
+
+### Atlas JSON Template (same structure for all 8 variants)
+
+Place this as `character-{N}.json` next to each PNG, replacing `{N}` with the variant number:
 
 ```json
 {
   "frames": {
-    "char-idle-0":  { "frame": { "x": 0,  "y": 0, "w": 32, "h": 64 } },
-    "char-drink-0": { "frame": { "x": 32, "y": 0, "w": 32, "h": 64 } },
-    "char-lean-0":  { "frame": { "x": 64, "y": 0, "w": 32, "h": 64 } },
-    "char-look-0":  { "frame": { "x": 96, "y": 0, "w": 32, "h": 64 } }
+    "char-idle-{N}":  { "frame": { "x": 0,  "y": 0, "w": 32, "h": 64 } },
+    "char-drink-{N}": { "frame": { "x": 32, "y": 0, "w": 32, "h": 64 } },
+    "char-lean-{N}":  { "frame": { "x": 64, "y": 0, "w": 32, "h": 64 } },
+    "char-look-{N}":  { "frame": { "x": 96, "y": 0, "w": 32, "h": 64 } }
   },
   "meta": {
     "image": "character-{N}.png",
@@ -532,6 +608,10 @@ convert assets/sprites/characters/character-0.png -unique-colors txt: | wc -l
 | Character 1 (cyan) | `assets/sprites/characters/character-1.png` + `.json` |
 | Character 2 (pink) | `assets/sprites/characters/character-2.png` + `.json` |
 | Character 3 (amber) | `assets/sprites/characters/character-3.png` + `.json` |
+| Character 4 (green) | `assets/sprites/characters/character-4.png` + `.json` |
+| Character 5 (red) | `assets/sprites/characters/character-5.png` + `.json` |
+| Character 6 (blue) | `assets/sprites/characters/character-6.png` + `.json` |
+| Character 7 (silver) | `assets/sprites/characters/character-7.png` + `.json` |
 | Door | `assets/sprites/objects/door.png` |
 | Jukebox | `assets/sprites/objects/jukebox.png` |
 | Drinks | `assets/sprites/objects/drinks.png` + `.json` |

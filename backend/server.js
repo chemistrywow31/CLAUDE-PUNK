@@ -15,9 +15,19 @@ import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 import { EventEmitter } from 'node:events';
+import { execSync } from 'node:child_process';
 import http from 'node:http';
 
 // ─── Section 1: Config ───────────────────────────────────────────────────────
+
+/** Resolve a CLI command to its absolute path via `which`, falling back to the bare name. */
+function resolveCommand(name) {
+  try {
+    return execSync(`which ${name}`, { encoding: 'utf8' }).trim();
+  } catch {
+    return name;
+  }
+}
 
 const CONFIG = {
   port: parseInt(process.env.PORT || '3000', 10),
@@ -33,8 +43,8 @@ const CONFIG = {
   ptyDefaultRows: 40,
   autoRunDelayMs: 300,
   agentCommands: {
-    claude: '/Users/paul_huang/.local/bin/claude --dangerously-skip-permissions',
-    codex: 'codex --full-auto',
+    claude: `${resolveCommand('claude')} --dangerously-skip-permissions`,
+    codex: `${resolveCommand('codex')} --full-auto`,
   },
   fileWatchDebounceMs: 500,
   fileTreeMaxDepth: 3,
