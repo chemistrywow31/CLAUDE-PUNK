@@ -47,7 +47,7 @@ const CONFIG = {
     codex: `${resolveCommand('codex')} --full-auto`,
   },
   fileWatchDebounceMs: 500,
-  fileTreeMaxDepth: 3,
+  fileTreeMaxDepth: 10,
   shutdownTimeoutMs: 5000,
 };
 
@@ -495,7 +495,15 @@ async function buildFileTree(dir, currentDepth = 0, baseDir = null) {
     const fullPath = path.join(dir, entry.name);
     const relPath = path.relative(baseDir, fullPath);
 
-    if (entry.isDirectory()) {
+    // Resolve symlinks via stat (follows links) to get real type
+    let realStat;
+    try {
+      realStat = await fs.promises.stat(fullPath);
+    } catch {
+      continue; // skip broken symlinks or inaccessible entries
+    }
+
+    if (realStat.isDirectory()) {
       const children = await buildFileTree(fullPath, currentDepth + 1, baseDir);
       nodes.push({
         name: entry.name,
@@ -503,19 +511,12 @@ async function buildFileTree(dir, currentDepth = 0, baseDir = null) {
         isDir: true,
         children,
       });
-    } else if (entry.isFile()) {
-      let size = 0;
-      try {
-        const stat = await fs.promises.stat(fullPath);
-        size = stat.size;
-      } catch {
-        // ignore
-      }
+    } else if (realStat.isFile()) {
       nodes.push({
         name: entry.name,
         path: relPath,
         isDir: false,
-        size,
+        size: realStat.size,
       });
     }
   }

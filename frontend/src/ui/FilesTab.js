@@ -52,7 +52,7 @@ export default class FilesTab {
       this.renderTree(payload.tree);
     });
 
-    // Listen for file count updates
+    // Listen for file count updates and auto-refresh tree
     this.unsubFiles = wsService.on('files.update', (payload) => {
       if (payload.sessionId !== this.sessionId) return;
       this.fileCount = payload.fileCount;
@@ -61,6 +61,8 @@ export default class FilesTab {
       if (countEl) {
         countEl.textContent = `${this.fileCount} files \u2192 ${this.drinkCount} drinks`;
       }
+      // Auto-refresh tree when files change (debounced by backend already)
+      wsService.requestFileTree(this.sessionId);
     });
 
     // Request tree on render

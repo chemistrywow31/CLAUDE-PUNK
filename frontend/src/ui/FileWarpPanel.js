@@ -12,6 +12,7 @@ export default class FileWarpPanel {
     this.el = null;
     this.treeEl = null;
     this.unsubTree = null;
+    this.unsubFiles = null;
   }
 
   render(container) {
@@ -34,6 +35,12 @@ export default class FileWarpPanel {
     this.unsubTree = wsService.on('files.tree', (payload) => {
       if (payload.sessionId !== this.sessionId) return;
       this.renderTree(payload.tree);
+    });
+
+    // Auto-refresh tree when files change
+    this.unsubFiles = wsService.on('files.update', (payload) => {
+      if (payload.sessionId !== this.sessionId) return;
+      wsService.requestFileTree(this.sessionId);
     });
 
     this.requestTree();
@@ -126,6 +133,10 @@ export default class FileWarpPanel {
     if (this.unsubTree) {
       this.unsubTree();
       this.unsubTree = null;
+    }
+    if (this.unsubFiles) {
+      this.unsubFiles();
+      this.unsubFiles = null;
     }
     if (this.el && this.el.parentNode) {
       this.el.parentNode.removeChild(this.el);
