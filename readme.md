@@ -12,32 +12,32 @@ A cyberpunk pixel-art bar game that turns AI coding agents into bar patrons. Eac
 
 <p align="center">
   <img src="frontend/public/assets/screenshots/screenshot-1.png" width="600"><br>
-  <em>caption 1</em>
+  <em>overview</em>
 </p>
 
 <p align="center">
   <img src="frontend/public/assets/screenshots/screenshot-2.png" width="600"><br>
-  <em>caption 2</em>
+  <em>create session</em>
 </p>
 
 <p align="center">
   <img src="frontend/public/assets/screenshots/screenshot-3.png" width="600"><br>
-  <em>caption 3</em>
+  <em>warp & xTerm</em>
 </p>
 
 <p align="center">
   <img src="frontend/public/assets/screenshots/screenshot-4.png" width="600"><br>
-  <em>caption 4</em>
+  <em>Files & editor </em>
 </p>
 
 <p align="center">
   <img src="frontend/public/assets/screenshots/screenshot-5.png" width="600"><br>
-  <em>caption 4</em>
+  <em>Files & preview</em>
 </p>
 
 <p align="center">
   <img src="frontend/public/assets/screenshots/screenshot-6.png" width="600"><br>
-  <em>caption 4</em>
+  <em>Jukebox</em>
 </p>
 
 ## How It Works
