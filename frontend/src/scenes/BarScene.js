@@ -23,6 +23,7 @@ import Bartender from '../entities/Bartender.js';
 import TerminalTab from '../ui/TerminalTab.js';
 import wsService from '../services/websocket.js';
 import jukeboxAudio from '../services/jukeboxAudio.js';
+import retroTvPlayer from '../services/retroTvPlayer.js';
 import costTracker from '../services/costTracker.js';
 
 export default class BarScene extends Phaser.Scene {
@@ -39,6 +40,7 @@ export default class BarScene extends Phaser.Scene {
     this.folderPicker = null;
     this.dialogBox = null;
     this.jukeboxUI = null;
+    this.retroTvUI = null;
 
     // Session metadata
     this.sessionMeta = new Map();
@@ -68,6 +70,7 @@ export default class BarScene extends Phaser.Scene {
     this.createCostDashboard();
     this.drawDoor();
     this.drawJukebox();
+    this.drawRetroTV();
     this.drawNeonSigns();
     this.setupWebSocketListeners();
     this.setupDemoMode();
@@ -111,6 +114,13 @@ export default class BarScene extends Phaser.Scene {
     if (!jbTex || jbTex.frameTotal <= 2) {
       if (jbTex) this.textures.remove('jukebox');
       this.generateJukeboxTexture();
+    }
+
+    // Retro TV texture
+    const tvTex = this.textures.exists('retro-tv') ? this.textures.get('retro-tv') : null;
+    if (!tvTex || tvTex.frameTotal <= 1) {
+      if (tvTex) this.textures.remove('retro-tv');
+      this.generateRetroTVTexture();
     }
   }
 
@@ -301,6 +311,71 @@ export default class BarScene extends Phaser.Scene {
 
     const source = this.textures.get(tmpKey).getSourceImage();
     this.textures.addSpriteSheet('jukebox', source, {
+      frameWidth: fw,
+      frameHeight: fh,
+    });
+    this.textures.remove(tmpKey);
+  }
+
+  generateRetroTVTexture() {
+    const g = this.make.graphics({ x: 0, y: 0, add: false });
+    const fw = 72;
+    const fh = 52;
+
+    const screenColors = [0x0b1a24, 0x103048, 0x0f2a3a];
+    const glowAlpha = [0.25, 0.5, 0.4];
+
+    for (let frame = 0; frame < 3; frame++) {
+      const ox = frame * fw;
+
+      // Body
+      g.fillStyle(0x2a2a3a);
+      g.fillRoundedRect(ox + 2, 4, 68, 44, 6);
+
+      // Bezel
+      g.fillStyle(0x3a3a4e);
+      g.fillRoundedRect(ox + 6, 8, 60, 30, 4);
+
+      // Screen glow
+      g.fillStyle(screenColors[frame], glowAlpha[frame]);
+      g.fillRect(ox + 10, 12, 52, 22);
+
+      // Screen dark layer
+      g.fillStyle(0x06070d, 0.9);
+      g.fillRect(ox + 12, 14, 48, 18);
+
+      // Scanline hints
+      g.fillStyle(0x00f0ff, 0.12 + frame * 0.05);
+      for (let i = 0; i < 4; i++) {
+        g.fillRect(ox + 14, 16 + i * 4, 44, 1);
+      }
+
+      // Control panel
+      g.fillStyle(0x1a1a2e);
+      g.fillRect(ox + 8, 40, 56, 6);
+
+      // Knobs
+      g.fillStyle(0xffaa00, 0.7);
+      g.fillCircle(ox + 18, 43, 2);
+      g.fillStyle(0x00f0ff, 0.7);
+      g.fillCircle(ox + 28, 43, 2);
+
+      // Feet
+      g.fillStyle(0x4a4a5e);
+      g.fillRect(ox + 10, 48, 12, 4);
+      g.fillRect(ox + 50, 48, 12, 4);
+
+      // Border
+      g.lineStyle(1, 0xff0080, frame === 0 ? 0.4 : 0.7);
+      g.strokeRoundedRect(ox + 2, 4, 68, 44, 6);
+    }
+
+    const tmpKey = '__retro_tv_tmp';
+    g.generateTexture(tmpKey, fw * 3, fh);
+    g.destroy();
+
+    const source = this.textures.get(tmpKey).getSourceImage();
+    this.textures.addSpriteSheet('retro-tv', source, {
       frameWidth: fw,
       frameHeight: fh,
     });
@@ -817,6 +892,61 @@ export default class BarScene extends Phaser.Scene {
     label.setOrigin(0.5, 0);
     label.setDepth(15);
   }
+
+  drawRetroTV() {
+    const tvX = 1300;
+    const tvY = 260;
+    const tvScale = 3;
+
+    const tv = this.add.sprite(tvX, tvY, 'retro-tv', 0);
+    tv.setOrigin(0.5, 1);
+    tv.setScale(tvScale);
+    tv.setDepth(6);
+    tv.setInteractive({ useHandCursor: true });
+
+    const glow = this.add.graphics();
+    glow.setDepth(5);
+    glow.fillStyle(0x00f0ff, 0.06);
+    glow.fillCircle(tvX, tvY - 28, 120);
+    glow.fillStyle(0xff0080, 0.04);
+    glow.fillCircle(tvX, tvY - 28, 80);
+
+    let frame = 1;
+    this.time.addEvent({
+      delay: 320,
+      loop: true,
+      callback: () => {
+        if (tv.active === false) return;
+        if (retroTvPlayer.playing) {
+          tv.setFrame(frame);
+          frame = frame >= 2 ? 1 : frame + 1;
+        } else {
+          tv.setFrame(0);
+          frame = 1;
+        }
+      },
+    });
+
+    tv.on('pointerover', () => tv.setTint(0x44ffff));
+    tv.on('pointerout', () => tv.clearTint());
+
+    tv.on('pointerdown', () => {
+      if (this.retroTvUI) this.retroTvUI.toggle();
+    });
+
+    const label = this.add.text(tvX, tvY + 10, 'RETRO TV', {
+      fontSize: '15px',
+      fontFamily: 'Rajdhani, sans-serif',
+      fontStyle: 'bold',
+      color: '#00f0ff',
+      stroke: '#0a0a14',
+      strokeThickness: 4,
+    });
+    label.setOrigin(0.5, 0);
+    label.setDepth(15);
+
+  }
+
 
   drawNeonSigns() {
     // -- "CLAUDE PUNK" neon sign -- isometric tilt matching 2.5D perspective --

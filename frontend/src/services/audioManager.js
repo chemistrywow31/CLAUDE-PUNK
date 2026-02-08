@@ -21,6 +21,7 @@ class AudioManager {
     this.playing = false;
     this.playlist = [];
     this.currentIndex = 0;
+    this._externalPaused = false;
 
     // When a track ends, play the next one
     this.audio.addEventListener('ended', () => {
@@ -55,6 +56,18 @@ class AudioManager {
     this.playCurrentTrack();
   }
 
+  pauseForExternal() {
+    if (!this.playing) return;
+    this._externalPaused = true;
+    this.audio.pause();
+  }
+
+  resumeFromExternal() {
+    if (!this._externalPaused || !this.playing) return;
+    this._externalPaused = false;
+    this.audio.play().catch(() => {});
+  }
+
   setVolume(val) {
     this.volume = Math.max(0, Math.min(1, val));
     if (!this.muted) {
@@ -67,9 +80,13 @@ class AudioManager {
   }
 
   toggleMute() {
-    this.muted = !this.muted;
-    this.audio.volume = this.muted ? 0 : this.volume;
+    this.setMuted(!this.muted);
     return this.muted;
+  }
+
+  setMuted(isMuted) {
+    this.muted = Boolean(isMuted);
+    this.audio.volume = this.muted ? 0 : this.volume;
   }
 
   isMuted() {

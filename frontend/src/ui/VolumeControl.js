@@ -5,6 +5,8 @@
  */
 
 import audioManager from '../services/audioManager.js';
+import jukeboxAudio from '../services/jukeboxAudio.js';
+import retroTvPlayer from '../services/retroTvPlayer.js';
 
 export default class VolumeControl {
   constructor() {
@@ -24,7 +26,10 @@ export default class VolumeControl {
     this.muteBtn.textContent = '\u266B'; // ♫
     this.muteBtn.title = 'Mute / Unmute';
     this.muteBtn.addEventListener('click', () => {
-      const muted = audioManager.toggleMute();
+      const muted = !audioManager.isMuted();
+      audioManager.setMuted(muted);
+      jukeboxAudio.setMuted(muted);
+      retroTvPlayer.setMuted(muted);
       this.updateMuteIcon(muted);
     });
 
@@ -38,8 +43,12 @@ export default class VolumeControl {
     this.slider.addEventListener('input', () => {
       const val = parseInt(this.slider.value, 10) / 100;
       audioManager.setVolume(val);
+      jukeboxAudio.setVolume(val);
+      retroTvPlayer.setVolume(val);
       if (audioManager.isMuted() && val > 0) {
-        audioManager.toggleMute();
+        audioManager.setMuted(false);
+        jukeboxAudio.setMuted(false);
+        retroTvPlayer.setMuted(false);
         this.updateMuteIcon(false);
       }
     });

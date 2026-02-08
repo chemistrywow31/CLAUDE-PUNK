@@ -9,6 +9,7 @@ import DialogBox from './ui/DialogBox.js';
 import FolderPicker from './ui/FolderPicker.js';
 import VolumeControl from './ui/VolumeControl.js';
 import Jukebox from './ui/Jukebox.js';
+import RetroTV from './ui/RetroTV.js';
 import HotkeyManager from './managers/HotkeyManager.js';
 import wsService from './services/websocket.js';
 import audioManager from './services/audioManager.js';
@@ -21,6 +22,7 @@ import './styles/terminal.css';
 import './styles/folder-picker.css';
 import './styles/volume-control.css';
 import './styles/jukebox.css';
+import './styles/retro-tv.css';
 import './styles/file-warp.css';
 import './styles/file-editor.css';
 
@@ -48,19 +50,24 @@ const game = new Phaser.Game(config);
 // Wait for scene to be ready, then wire up UI overlays
 game.events.on('ready', () => {
   const scene = game.scene.getScene('BarScene');
+  import('./services/retroTvPlayer.js').then(({ default: retroTvPlayer }) => {
+    retroTvPlayer.ensurePlayers('retro-tv-player');
+  });
 
   // Initialize UI overlays
   const dialogBox = new DialogBox();
   const folderPicker = new FolderPicker();
   const jukeboxUI = new Jukebox();
+  const retroTvUI = new RetroTV();
 
   // Wire overlays to scene
   scene.dialogBox = dialogBox;
   scene.folderPicker = folderPicker;
   scene.jukeboxUI = jukeboxUI;
+  scene.retroTvUI = retroTvUI;
 
   // Hotkey manager — assigns letters to patrons, Ctrl+` closes overlays
-  scene.hotkeyManager = new HotkeyManager(scene, dialogBox, folderPicker, jukeboxUI);
+  scene.hotkeyManager = new HotkeyManager(scene, dialogBox, folderPicker, jukeboxUI, retroTvUI);
 
   // Disable Phaser input when HTML overlays are visible (prevents click-through)
   folderPicker.onShow = () => { scene.input.enabled = false; };
@@ -69,6 +76,8 @@ game.events.on('ready', () => {
   dialogBox.onClose = () => { scene.input.enabled = true; };
   jukeboxUI.onShow = () => { scene.input.enabled = false; };
   jukeboxUI.onHide = () => { scene.input.enabled = true; };
+  retroTvUI.onShow = () => { scene.input.enabled = false; };
+  retroTvUI.onHide = () => { scene.input.enabled = true; };
 
   // WebSocket connection is initiated by BarScene.setupWebSocketListeners()
   // after all event listeners are registered, ensuring no replay messages are lost.

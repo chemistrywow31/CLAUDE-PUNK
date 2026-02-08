@@ -40,6 +40,11 @@ A cyberpunk pixel-art bar game that turns AI coding agents into bar patrons. Eac
   <em>Jukebox</em>
 </p>
 
+<p align="center">
+  <img src="frontend/public/assets/screenshots/screenshot-7.png" width="600"><br>
+  <em>Retro TV</em>
+</p>
+
 ## How It Works
 
 1. You pick a project folder via the in-game door
@@ -92,6 +97,18 @@ Click the **jukebox** sprite on the left side of the bar to open the music playe
 - **Background music** — the bar's ambient background music automatically pauses when the jukebox plays and resumes when it stops
 - The jukebox sprite shows an animated equalizer while music is playing
 
+### Retro TV
+
+Click the **retro TV** sprite on the right side of the bar to open the video player overlay. Search YouTube, add videos by URL, and build a playlist.
+
+- **Search** — type a query and page through results (10 per page)
+- **Add by URL / ID** — paste a YouTube URL or video ID to add directly
+- **Playlist** — shown in the right sidebar; click a track to play, remove with the X button
+- **Controls** — play/pause, previous/next, seek, volume, and loop mode (ALL / ONE)
+- **Settings** — click the gear icon to open settings and set/remove your YouTube API key
+- **Persistence** — playlist is stored in IndexedDB (`claude-punk-retrotv`) and survives reloads
+- **Audio coordination** — Retro TV playback pauses the jukebox, and jukebox playback pauses Retro TV
+
 ### Bar Tab (Cost Dashboard)
 
 A neon "BAR TAB" menu board is displayed near the bartender, showing estimated API token usage and cost for each active agent at a glance.
@@ -121,7 +138,7 @@ Each character shows a pixel-art speech bubble above their head summarizing what
 
 | Shortcut | Context | Action |
 |----------|---------|--------|
-| `Ctrl+`` ` | Anywhere | Close any open overlay (dialog, folder picker, jukebox) |
+| `Ctrl+`` ` | Anywhere | Close any open overlay (dialog, folder picker, jukebox, retro TV) |
 | `Escape` | When not focused in terminal | Close current overlay |
 | `a` - `z` | Bar scene (no overlay open) | Open dialog for the patron with that hotkey letter |
 
@@ -151,10 +168,13 @@ claude-punk/
 │   │   │   ├── FileWarpPanel.js   # Terminal sidebar file tree
 │   │   │   ├── FolderPicker.js
 │   │   │   ├── Jukebox.js
+│   │   │   ├── RetroTV.js
 │   │   │   └── ClaudeConfigTab.js
 │   │   ├── services/       # WebSocket client, audio
+│   │   │   └── retroTvPlayer.js
 │   │   ├── config/         # Game constants and configuration
 │   │   └── styles/         # CSS files
+│   │       └── retro-tv.css
 │   ├── index.html
 │   └── vite.config.js
 └── assets/                 # Game art (sprites, backgrounds)
@@ -263,6 +283,18 @@ npm run dev        # 一個指令同時啟動前後端
 - **背景音樂** —— 點唱機播放時，酒吧的環境背景音樂會自動暫停；點唱機停止後自動恢復
 - 音樂播放時，點唱機精靈圖會顯示動態等化器動畫
 
+### 復古電視（Retro TV）
+
+點擊酒吧右側的**復古電視**精靈圖開啟影片播放器。可搜尋 YouTube、用網址加入影片並建立播放清單。
+
+- **搜尋** —— 輸入關鍵字並使用分頁（每頁 10 筆）
+- **用網址加入** —— 貼上 YouTube 影片網址或 ID 直接加入
+- **播放清單** —— 右側欄顯示，點擊曲目播放，用 X 按鈕移除
+- **控制項** —— 播放/暫停、上一首/下一首、進度、音量、循環模式（全部 / 單曲）
+- **設定** —— 點擊齒輪圖示開啟設定，新增/移除 YouTube API Key
+- **持久化** —— 播放清單儲存在 IndexedDB（`claude-punk-retrotv`），重新整理後仍保留
+- **音訊協調** —— 復古電視播放時會暫停點唱機，點唱機播放時也會暫停復古電視
+
 ### 吧台帳單（Bar Tab）
 
 調酒師旁邊有一塊霓虹風格的「BAR TAB」菜單看板，一目了然顯示每個 Agent 的預估 API Token 用量與費用。
@@ -292,7 +324,7 @@ npm run dev        # 一個指令同時啟動前後端
 
 | 快捷鍵 | 情境 | 動作 |
 |--------|------|------|
-| `Ctrl+`` ` | 任何時候 | 關閉任何開啟的覆蓋層（對話面板、資料夾選擇器、點唱機） |
+| `Ctrl+`` ` | 任何時候 | 關閉任何開啟的覆蓋層（對話面板、資料夾選擇器、點唱機、復古電視） |
 | `Escape` | 非終端機焦點時 | 關閉當前覆蓋層 |
 | `a` - `z` | 酒吧場景（無覆蓋層開啟時） | 開啟對應快捷鍵字母的客人對話面板 |
 
@@ -322,10 +354,13 @@ claude-punk/
 │   │   │   ├── FileWarpPanel.js   # 終端機側欄檔案樹
 │   │   │   ├── FolderPicker.js
 │   │   │   ├── Jukebox.js
+│   │   │   ├── RetroTV.js
 │   │   │   └── ClaudeConfigTab.js
 │   │   ├── services/       # WebSocket 客戶端、音訊
+│   │   │   └── retroTvPlayer.js
 │   │   ├── config/         # 遊戲常數與設定
 │   │   └── styles/         # CSS 檔案
+│   │       └── retro-tv.css
 │   ├── index.html
 │   └── vite.config.js
 └── assets/                 # 遊戲美術（精靈圖、背景）

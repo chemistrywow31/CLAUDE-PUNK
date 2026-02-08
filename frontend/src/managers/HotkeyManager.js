@@ -3,15 +3,16 @@
  * global keyboard shortcuts for opening dialogs and closing overlays.
  *
  * - Single letter key (no modifiers, no overlay open, no input focused) opens dialog
- * - Ctrl+` closes any open overlay (dialog, folder picker, jukebox)
+ * - Ctrl+` closes any open overlay (dialog, folder picker, jukebox, retro TV)
  */
 
 export default class HotkeyManager {
-  constructor(scene, dialogBox, folderPicker, jukeboxUI) {
+  constructor(scene, dialogBox, folderPicker, jukeboxUI, retroTvUI) {
     this.scene = scene;
     this.dialogBox = dialogBox;
     this.folderPicker = folderPicker;
     this.jukeboxUI = jukeboxUI;
+    this.retroTvUI = retroTvUI;
 
     // Pool of available letters
     this.pool = 'abcdefghijklmnopqrstuvwxyz'.split('');
@@ -62,6 +63,7 @@ export default class HotkeyManager {
     if (this.dialogBox && this.dialogBox.visible) return true;
     if (this.folderPicker && this.folderPicker.visible) return true;
     if (this.jukeboxUI && this.jukeboxUI.visible) return true;
+    if (this.retroTvUI && this.retroTvUI.visible) return true;
     return false;
   }
 
@@ -72,6 +74,7 @@ export default class HotkeyManager {
     if (this.dialogBox && this.dialogBox.visible) this.dialogBox.close();
     if (this.folderPicker && this.folderPicker.visible) this.folderPicker.hide();
     if (this.jukeboxUI && this.jukeboxUI.visible) this.jukeboxUI.hide();
+    if (this.retroTvUI && this.retroTvUI.visible) this.retroTvUI.hide();
   }
 
   _onKeyDown(e) {

@@ -37,12 +37,17 @@ class JukeboxAudio {
     this.audio.loop = false;
     this.volume = 0.6;
     this.audio.volume = this.volume;
+    this.muted = false;
     this.playing = false;
     this.playlist = []; // { id, name, url }
     this.currentIndex = -1;
     this.loopMode = LOOP_ALL;
     this.onChange = null; // callback for UI re-render
     this._db = null;
+    this._externalSuspend = false;
+    this._externalWasPlaying = false;
+    this._retroSuspend = false;
+    this._retroWasPlaying = false;
 
     this.audio.addEventListener('ended', () => {
       this._onTrackEnded();
@@ -205,6 +210,7 @@ class JukeboxAudio {
     if (this.playlist.length === 0) return;
     if (this.currentIndex < 0) this.currentIndex = 0;
     this.playing = true;
+    this._suspendRetroTv();
     this._pauseBackgroundMusic();
     this._playCurrentTrack();
     this._notify();
@@ -214,6 +220,7 @@ class JukeboxAudio {
     this.playing = false;
     this.audio.pause();
     this._resumeBackgroundMusic();
+    this._resumeRetroTv();
     this._notify();
   }
 
@@ -225,11 +232,38 @@ class JukeboxAudio {
     }
   }
 
+  suspendForExternalPlayback() {
+    if (this._externalSuspend) return;
+    this._externalSuspend = true;
+    this._externalWasPlaying = this.playing;
+    if (this.playing) {
+      this.playing = false;
+      this.audio.pause();
+    }
+    this._notify();
+  }
+
+  resumeAfterExternalPlayback() {
+    if (!this._externalSuspend) return false;
+    this._externalSuspend = false;
+    if (this._externalWasPlaying && this.playlist.length > 0 && this.currentIndex >= 0) {
+      this.playing = true;
+      this._pauseBackgroundMusic();
+      this.audio.play().catch(() => {});
+      this._notify();
+      return true;
+    }
+    this._externalWasPlaying = false;
+    this._notify();
+    return false;
+  }
+
   stop() {
     this.playing = false;
     this.audio.pause();
     this.audio.currentTime = 0;
     this._resumeBackgroundMusic();
+    this._resumeRetroTv();
     this._notify();
   }
 
@@ -253,8 +287,20 @@ class JukeboxAudio {
 
   setVolume(val) {
     this.volume = Math.max(0, Math.min(1, val));
-    this.audio.volume = this.volume;
+    if (!this.muted) {
+      this.audio.volume = this.volume;
+    }
     this._notify();
+  }
+
+  setMuted(isMuted) {
+    this.muted = Boolean(isMuted);
+    this.audio.volume = this.muted ? 0 : this.volume;
+    this._notify();
+  }
+
+  isMuted() {
+    return this.muted;
   }
 
   toggleLoopMode() {
@@ -306,6 +352,33 @@ class JukeboxAudio {
 
   _notify() {
     if (this.onChange) this.onChange();
+  }
+
+  async _suspendRetroTv() {
+    if (this._retroSuspend) return;
+    this._retroSuspend = true;
+    try {
+      const { default: retroTvPlayer } = await import('./retroTvPlayer.js');
+      this._retroWasPlaying = retroTvPlayer.playing;
+      if (retroTvPlayer.playing) {
+        retroTvPlayer.pause();
+      }
+    } catch (e) {
+      this._retroSuspend = false;
+    }
+  }
+
+  async _resumeRetroTv() {
+    if (!this._retroSuspend) return;
+    this._retroSuspend = false;
+    try {
+      const { default: retroTvPlayer } = await import('./retroTvPlayer.js');
+      if (this._retroWasPlaying) {
+        retroTvPlayer.play();
+      }
+    } finally {
+      this._retroWasPlaying = false;
+    }
   }
 }
 
