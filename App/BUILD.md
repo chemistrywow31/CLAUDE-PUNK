@@ -34,10 +34,10 @@
 
 ## 🚀 打包步驟
 
-### 方式 1: 使用專案根目錄的腳本
+### 方式 1: 使用 App 目錄的腳本
 
 ```bash
-cd /Users/paul_huang/AgentProjects/CLAUDE-PUNK
+cd /Users/paul_huang/AgentProjects/CLAUDE-PUNK/App
 ./build-app.sh
 ```
 
