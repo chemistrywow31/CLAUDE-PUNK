@@ -41,8 +41,10 @@ export default class TerminalTab {
     this.term = null;
     this.fitAddon = null;
     this.unsubOutput = null;
+    this.unsubReplay = null;
     this.resizeObserver = null;
     this.initialized = false;
+    this._pendingReplay = null; // deferred replay data + dimensions
 
     // Start listening for PTY output immediately so output is buffered
     // in the xterm.js screen buffer even while the dialog is closed.
@@ -91,9 +93,52 @@ export default class TerminalTab {
       this.term.write(payload.data);
     });
 
+    // Subscribe to replay events (sent on reconnect with PTY dimensions).
+    // Defer writing until the terminal is attached to the DOM and fit(),
+    // so line wrapping and cursor positioning match the actual size.
+    this.unsubReplay = wsService.on('terminal.replay', (payload) => {
+      if (payload.sessionId !== this.sessionId) return;
+      this._pendingReplay = payload;
+      // If already attached to DOM, apply immediately
+      if (this.el && this.el.parentNode) {
+        this._applyReplay();
+      }
+    });
+
     // Keyboard input → PTY
     this.term.onData((data) => {
       wsService.sendTerminalInput(this.sessionId, data);
+    });
+  }
+
+  /**
+   * Apply a deferred replay: reset the terminal, resize to the PTY dimensions
+   * the output was generated at, write the replay data, then fit to container.
+   */
+  _applyReplay() {
+    const replay = this._pendingReplay;
+    if (!replay) return;
+    this._pendingReplay = null;
+
+    // Full reset: clear screen, scrollback, and terminal state
+    this.term.reset();
+
+    // Resize xterm to the PTY dimensions so replay renders correctly
+    if (replay.cols && replay.rows) {
+      this.term.resize(replay.cols, replay.rows);
+    }
+
+    // Write replay data
+    this.term.write(replay.data);
+
+    // Now fit to the actual container and sync PTY
+    requestAnimationFrame(() => {
+      try {
+        this.fitAddon.fit();
+        wsService.resizeTerminal(this.sessionId, this.term.cols, this.term.rows);
+      } catch {
+        // ignore
+      }
     });
   }
 
@@ -133,8 +178,13 @@ export default class TerminalTab {
     // Fit after a frame so the container has its final size
     requestAnimationFrame(() => {
       try {
-        this.fitAddon.fit();
-        wsService.resizeTerminal(this.sessionId, this.term.cols, this.term.rows);
+        // If there's a pending replay, apply it (reset → resize → write → fit)
+        if (this._pendingReplay) {
+          this._applyReplay();
+        } else {
+          this.fitAddon.fit();
+          wsService.resizeTerminal(this.sessionId, this.term.cols, this.term.rows);
+        }
       } catch {
         // ignore
       }
@@ -191,6 +241,10 @@ export default class TerminalTab {
     if (this.unsubOutput) {
       this.unsubOutput();
       this.unsubOutput = null;
+    }
+    if (this.unsubReplay) {
+      this.unsubReplay();
+      this.unsubReplay = null;
     }
     if (this.resizeObserver) {
       this.resizeObserver.disconnect();

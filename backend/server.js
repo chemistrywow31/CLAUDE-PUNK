@@ -323,6 +323,8 @@ class SessionManager extends EventEmitter {
       rawReplayBuffer,
       lineBuffer,
       exitCode: null,
+      cols: CONFIG.ptyDefaultCols,
+      rows: CONFIG.ptyDefaultRows,
     };
 
     this.sessions.set(id, session);
@@ -353,6 +355,8 @@ class SessionManager extends EventEmitter {
   resize(id, cols, rows) {
     const session = this.getSession(id);
     session.proc.resize(cols, rows);
+    session.cols = cols;
+    session.rows = rows;
   }
 
   kill(id) {
@@ -685,11 +689,20 @@ function createWSS(server, sessionManager, fileWatcher) {
       sendToClient(ws, 'session.update', session);
     }
 
-    // Replay: send raw terminal output for xterm.js rendering
+    // Replay: send raw terminal output for xterm.js rendering.
+    // Uses a dedicated 'terminal.replay' event so the frontend can defer
+    // writing until the xterm is attached to the DOM and properly sized,
+    // preventing layout corruption from size mismatches.
     for (const session of activeSessions) {
       const rawData = sessionManager.getRawReplay(session.id);
       if (rawData) {
-        sendToClient(ws, 'terminal.output', { sessionId: session.id, data: rawData });
+        const s = sessionManager.sessions.get(session.id);
+        sendToClient(ws, 'terminal.replay', {
+          sessionId: session.id,
+          data: rawData,
+          cols: s?.cols || CONFIG.ptyDefaultCols,
+          rows: s?.rows || CONFIG.ptyDefaultRows,
+        });
       }
     }
 
