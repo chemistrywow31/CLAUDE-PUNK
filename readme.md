@@ -77,7 +77,65 @@ npm install -g @openai/codex
 
 Run `codex` once to authenticate with your OpenAI API key.
 
-## Getting Started
+## 📦 macOS App (Recommended for End Users)
+
+**Want to use CLAUDE PUNK without setting up development environment?** Download the standalone macOS app!
+
+### Download & Install
+
+1. **Download** the latest `.dmg` from [Releases](https://github.com/chemistrywow31/CLAUDE-PUNK/releases)
+2. **Drag** CLAUDE PUNK.app to your Applications folder
+3. **Double-click** to launch (macOS may show security warning on first run - click "Open")
+
+### Features
+
+- ✅ **Zero Configuration** - Just double-click and play
+- ✅ **Auto-Start Services** - Automatically starts backend & frontend
+- ✅ **Smart Port Detection** - Reuses existing services if already running
+- ✅ **One-Click Restart** - Press `Cmd+Shift+R` to restart services
+- ✅ **Auto-Cleanup** - Automatically stops all services when app quits
+
+### Keyboard Shortcuts
+
+- `Cmd+,` - Open Preferences
+- `Cmd+Shift+R` - Restart Services
+- `Cmd+R` - Reload Window
+- `Cmd+Q` - Quit (auto-stops all services)
+
+### Configuration
+
+Settings file location:
+```
+~/Library/Application Support/CLAUDE PUNK/config.json
+```
+
+Edit ports, Claude CLI path, and other settings:
+```bash
+# Open in Finder
+open "~/Library/Application Support/CLAUDE PUNK"
+```
+
+After editing, press `Cmd+Shift+R` to apply changes.
+
+### Troubleshooting
+
+**App won't start?**
+- Check logs: `~/Library/Logs/CLAUDE PUNK/main.log`
+- Or use menu: Help > View Logs
+
+**Port conflicts?**
+- Change ports in config.json (see above)
+- Default ports: 3000 (backend), 5173 (frontend)
+
+**Claude CLI not found?**
+- Install: `npm install -g @anthropic-ai/claude-code`
+- Or set custom path in Preferences
+
+For detailed documentation, see [ELECTRON_PACKAGING.md](ELECTRON_PACKAGING.md)
+
+---
+
+## Getting Started (For Developers)
 
 ### 1. Clone the repo
 
