@@ -10,7 +10,7 @@ tool/
 
 docs
 # Electron build output
-out/
+App/out/
 
 # Testing files
 test-electron.sh
