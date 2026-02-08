@@ -4,7 +4,7 @@
   "version": "2026.02.08.2205",
   "private": true,
   "description": "A cyberpunk pixel-art bar where AI coding agents become bar patrons",
-  "main": "App/electron/main.js",
+  "main": "electron/main.js",
   "type": "module",
   "author": "Paul Huang",
   "license": "MIT",
@@ -15,20 +15,20 @@
   "scripts": {
     "start": "electron .",
     "dev": "./start.sh",
-    "dev:concurrent": "npx concurrently -n back,front -c blue,green \"npm run dev --prefix backend\" \"npm run dev --prefix frontend\"",
-    "build:frontend": "npm run build --prefix frontend",
-    "build:version": "./App/scripts/generate-version.sh",
+    "dev:concurrent": "npx concurrently -n back,front -c blue,green \"npm run dev --prefix ../backend\" \"npm run dev --prefix ../frontend\"",
+    "build:frontend": "npm run build --prefix ../frontend",
+    "build:version": "./scripts/generate-version.sh",
     "prebuild": "npm run build:version",
     "build": "electron-builder",
-    "postinstall": "npm install --prefix backend && npm install --prefix frontend"
+    "postinstall": "npm install --prefix ../backend && npm install --prefix ../frontend"
   },
   "build": {
     "appId": "com.claudepunk.app",
     "productName": "CLAUDE PUNK",
     "files": [
-      "App/electron/**/*",
-      "backend/**/*",
-      "frontend/**/*",
+      "electron/**/*",
+      "../backend/**/*",
+      "../frontend/**/*",
       "!backend/node_modules/node-pty/prebuilds/!(darwin-*)",
       "!**/.git",
       "!**/.gitignore",
@@ -42,8 +42,8 @@
       "target": ["dmg"],
       "hardenedRuntime": true,
       "gatekeeperAssess": false,
-      "entitlements": "App/entitlements.mac.plist",
-      "entitlementsInherit": "App/entitlements.mac.plist"
+      "entitlements": "entitlements.mac.plist",
+      "entitlementsInherit": "entitlements.mac.plist"
     },
     "dmg": {
       "contents": [
@@ -57,7 +57,7 @@
       }
     },
     "directories": {
-      "output": "App/out"
+      "output": "out"
     }
   },
   "dependencies": {
