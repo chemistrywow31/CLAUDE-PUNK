@@ -13,10 +13,20 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import log from 'electron-log';
 import http from 'node:http';
+import { app } from 'electron';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
-const PROJECT_ROOT = path.join(__dirname, '..', '..');  // App/electron → App → CLAUDE-PUNK
+
+// Determine project root based on whether app is packaged
+// - Packaged: backend/frontend are in app.asar.unpacked or Resources/
+// - Development: backend/frontend are in parent directories
+const PROJECT_ROOT = app.isPackaged
+  ? path.join(process.resourcesPath)  // /Applications/CLAUDE PUNK.app/Contents/Resources/
+  : path.join(__dirname, '..', '..');  // App/electron → App → CLAUDE-PUNK
+
+log.info(`[ProcessManager] App packaged: ${app.isPackaged}`);
+log.info(`[ProcessManager] PROJECT_ROOT: ${PROJECT_ROOT}`);
 
 // ──── Global State ──────────────────────────────────────────────────────────
 
@@ -167,18 +177,21 @@ export async function startFrontend(config) {
   }
 
   const frontendDir = path.join(PROJECT_ROOT, 'frontend');
+  const viteExecutable = path.join(frontendDir, 'node_modules', '.bin', 'vite');
 
   log.info(`🚀 Starting frontend on port ${config.frontend.port}...`);
+  log.info(`Using vite: ${viteExecutable}`);
 
-  frontendProcess = spawn('npm', ['run', 'dev'], {
+  // Use vite directly from node_modules/.bin
+  frontendProcess = spawn(viteExecutable, [], {
     cwd: frontendDir,
     env: {
       ...process.env,
+      PORT: config.frontend.port.toString(),
       VITE_PORT: config.frontend.port.toString(),
       BACKEND_URL: `http://127.0.0.1:${config.backend.port}`,
     },
     stdio: 'pipe',
-    shell: true,
   });
 
   // Log frontend output
