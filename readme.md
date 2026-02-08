@@ -51,94 +51,22 @@ A cyberpunk pixel-art bar game that turns AI coding agents into bar patrons. Eac
 
 ## Prerequisites
 
-Before you begin, make sure you have the following installed:
-
-### Node.js (v20+)
-
-```bash
-# macOS (Homebrew)
-brew install node
-
-# Or use nvm
-nvm install 20
-nvm use 20
-```
-
-### node-pty dependencies
-```
-sudo apt-get update
-sudo apt-get install -y make python build-essential
-```
-
-### Claude Code CLI
-
-This project spawns Claude Code as a subprocess. Install it globally:
-
-```bash
-npm install -g @anthropic-ai/claude-code
-```
-
-After installing, run `claude` once to complete the authentication flow (you'll need an Anthropic API key or a Claude Pro/Team subscription).
-
-### OpenAI Codex CLI (optional)
-
-If you want to use Codex agents in addition to Claude:
-
-```bash
-npm install -g @openai/codex
-```
-
-Run `codex` once to authenticate with your OpenAI API key.
+- **Node.js v20+** — `brew install node` (macOS) or [nodejs.org](https://nodejs.org/)
+- **Claude Code CLI** — `npm install -g @anthropic-ai/claude-code`, then run `claude` once to authenticate
+- **OpenAI Codex CLI** (optional) — `npm install -g @openai/codex`, then run `codex` once to authenticate
 
 ## Getting Started
-
-### 1. Clone the repo
 
 ```bash
 git clone <repo-url>
 cd claude-punk
+npm install        # installs backend + frontend dependencies automatically
+npm run dev        # starts both backend and frontend in one terminal
 ```
 
-### 2. Install backend dependencies
+Open `http://localhost:5173` in your browser. That's it.
 
-```bash
-cd backend
-npm install
-```
-
-> **Note:** `node-pty` is a native module and requires build tools. On macOS you need Xcode Command Line Tools (`xcode-select --install`). On Linux you need `build-essential` and `python3`.
-
-### 3. Install frontend dependencies
-
-```bash
-cd ../frontend
-npm install
-```
-
-### 4. Start the backend
-
-```bash
-cd ../backend
-npm run dev
-```
-
-The backend starts on `http://127.0.0.1:3000`. You should see:
-
-```
-[Claude Punk] Backend running on http://127.0.0.1:3000
-[Claude Punk] WebSocket at ws://127.0.0.1:3000/ws
-```
-
-### 5. Start the frontend (in a new terminal)
-
-```bash
-cd frontend
-npm run dev
-```
-
-The frontend starts on `http://localhost:5173`. Open it in your browser.
-
-Vite automatically proxies `/ws` and `/api` requests to the backend, so everything works through a single URL.
+> The backend runs on port 3000, and Vite automatically proxies `/ws` and `/api` requests to it — everything works through a single URL.
 
 ## Usage
 
@@ -205,6 +133,7 @@ Each character shows a pixel-art speech bubble above their head summarizing what
 
 ```
 claude-punk/
+├── package.json            # Root: one-command install & dev
 ├── backend/                # Node.js backend
 │   ├── server.js           # Single-file entry point (Express + WebSocket + PTY)
 │   └── package.json
@@ -260,7 +189,7 @@ The backend has a `CONFIG` object at the top of `server.js` with tunable values:
 ## Troubleshooting
 
 **`node-pty` fails to install**
-Make sure you have native build tools: `xcode-select --install` on macOS, or `sudo apt install build-essential python3` on Ubuntu/Debian.
+`node-pty` ships with prebuilt binaries for macOS and Windows. If the prebuilt fails, you may need native build tools: `xcode-select --install` on macOS, or `sudo apt install build-essential python3` on Linux.
 
 **"claude: command not found" when a session starts**
 Install the Claude CLI globally: `npm install -g @anthropic-ai/claude-code`, then run `claude` once to authenticate.
@@ -293,92 +222,22 @@ Kill the existing process or change the port: `PORT=3001 node server.js` (and up
 
 ## 前置需求
 
-### Node.js (v20+)
-
-```bash
-# macOS (Homebrew)
-brew install node
-
-# 或使用 nvm
-nvm install 20
-nvm use 20
-```
-
-### node-pty 相依套件
-```
-sudo apt-get update
-sudo apt-get install -y make python build-essential
-```
-
-### Claude Code CLI
-
-本專案以子程序方式啟動 Claude Code，需全域安裝：
-
-```bash
-npm install -g @anthropic-ai/claude-code
-```
-
-安裝後執行一次 `claude` 完成認證流程（需要 Anthropic API Key 或 Claude Pro/Team 訂閱）。
-
-### OpenAI Codex CLI（選用）
-
-如果你也想使用 Codex Agent：
-
-```bash
-npm install -g @openai/codex
-```
-
-執行一次 `codex` 以你的 OpenAI API Key 進行認證。
+- **Node.js v20+** — `brew install node`（macOS）或 [nodejs.org](https://nodejs.org/)
+- **Claude Code CLI** — `npm install -g @anthropic-ai/claude-code`，安裝後執行一次 `claude` 完成認證
+- **OpenAI Codex CLI**（選用）— `npm install -g @openai/codex`，安裝後執行一次 `codex` 完成認證
 
 ## 快速開始
-
-### 1. Clone 專案
 
 ```bash
 git clone <repo-url>
 cd claude-punk
+npm install        # 自動安裝前後端所有相依套件
+npm run dev        # 一個指令同時啟動前後端
 ```
 
-### 2. 安裝後端相依套件
+在瀏覽器開啟 `http://localhost:5173`，完成。
 
-```bash
-cd backend
-npm install
-```
-
-> **注意：** `node-pty` 是原生模組，需要編譯工具。macOS 需要 Xcode Command Line Tools（`xcode-select --install`），Linux 需要 `build-essential` 和 `python3`。
-
-### 3. 安裝前端相依套件
-
-```bash
-cd ../frontend
-npm install
-```
-
-### 4. 啟動後端
-
-```bash
-cd ../backend
-npm run dev
-```
-
-後端啟動於 `http://127.0.0.1:3000`，你會看到：
-
-```
-[Claude Punk] Backend running on http://127.0.0.1:3000
-[Claude Punk] WebSocket at ws://127.0.0.1:3000/ws
-```
-
-### 5. 啟動前端（開新終端機）
-
-```bash
-cd frontend
-npm run dev
-```
-
-前端啟動於 `http://localhost:5173`，在瀏覽器中開啟即可。
-
-Vite 會自動將 `/ws` 和 `/api` 請求代理到後端，所以只需透過一個 URL 操作。
+> 後端運行於 port 3000，Vite 會自動將 `/ws` 和 `/api` 請求代理到後端 —— 只需透過一個 URL 操作。
 
 ## 使用方式
 
@@ -445,6 +304,7 @@ Vite 會自動將 `/ws` 和 `/api` 請求代理到後端，所以只需透過一
 
 ```
 claude-punk/
+├── package.json            # 根目錄：一鍵安裝與啟動
 ├── backend/                # Node.js 後端
 │   ├── server.js           # 單檔入口（Express + WebSocket + PTY）
 │   └── package.json
@@ -500,13 +360,13 @@ claude-punk/
 ## 疑難排解
 
 **`node-pty` 安裝失敗**
-確保有原生編譯工具：macOS 執行 `xcode-select --install`，Ubuntu/Debian 執行 `sudo apt install build-essential python3`。
+`node-pty` 在 macOS 與 Windows 上自帶預編譯二進位檔。如果預編譯失敗，可能需要原生編譯工具：macOS 執行 `xcode-select --install`，Linux 執行 `sudo apt install build-essential python3`。
 
 **啟動 session 時出現 "claude: command not found"**
 全域安裝 Claude CLI：`npm install -g @anthropic-ai/claude-code`，然後執行一次 `claude` 進行認證。
 
 **WebSocket 連線失敗**
-確保在啟動前端之前後端已在 port 3000 上運行。Vite 會將 WebSocket 流量代理到後端。
+確保後端已在運行。`npm run dev` 會同時啟動前後端，正常情況下不會有此問題。
 
 **Port 已被佔用**
 終止現有程序或更換埠號：`PORT=3001 node server.js`（並相應更新 `vite.config.js` 的代理目標）。
