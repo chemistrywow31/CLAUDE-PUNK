@@ -1,18 +1,72 @@
 {
   "name": "claude-punk",
-  "version": "1.0.0",
+  "productName": "CLAUDE PUNK",
+  "version": "2026.02.08.2205",
   "private": true,
-  "description": "A cyberpunk pixel-art bar game that turns AI coding agents into bar patrons",
+  "description": "A cyberpunk pixel-art bar where AI coding agents become bar patrons",
+  "main": "electron/main.js",
+  "type": "module",
+  "author": "Paul Huang",
+  "license": "MIT",
   "workspaces": [
     "backend",
     "frontend"
   ],
   "scripts": {
-    "dev": "npx concurrently -n back,front -c blue,green \"npm run dev --prefix backend\" \"npm run dev --prefix frontend\"",
-    "build": "npm run build --prefix frontend",
-    "start": "npm run dev"
+    "start": "electron .",
+    "dev": "./start.sh",
+    "dev:concurrent": "npx concurrently -n back,front -c blue,green \"npm run dev --prefix backend\" \"npm run dev --prefix frontend\"",
+    "build:frontend": "npm run build --prefix frontend",
+    "build:version": "./scripts/generate-version.sh",
+    "prebuild": "npm run build:version",
+    "build": "electron-builder",
+    "postinstall": "npm install --prefix backend && npm install --prefix frontend"
+  },
+  "build": {
+    "appId": "com.claudepunk.app",
+    "productName": "CLAUDE PUNK",
+    "files": [
+      "electron/**/*",
+      "backend/**/*",
+      "frontend/**/*",
+      "!backend/node_modules/node-pty/prebuilds/!(darwin-*)",
+      "!**/.git",
+      "!**/.gitignore",
+      "!**/node_modules/*/{CHANGELOG.md,README.md,README,readme.md,readme}",
+      "!**/node_modules/*/{test,__tests__,tests,powered-test,example,examples}",
+      "!**/node_modules/*.d.ts",
+      "!**/node_modules/.bin"
+    ],
+    "mac": {
+      "category": "public.app-category.developer-tools",
+      "target": ["dmg"],
+      "hardenedRuntime": true,
+      "gatekeeperAssess": false,
+      "entitlements": "entitlements.mac.plist",
+      "entitlementsInherit": "entitlements.mac.plist"
+    },
+    "dmg": {
+      "contents": [
+        { "x": 130, "y": 220 },
+        { "x": 410, "y": 220, "type": "link", "path": "/Applications" }
+      ],
+      "title": "CLAUDE PUNK ${version}",
+      "window": {
+        "width": 540,
+        "height": 380
+      }
+    },
+    "directories": {
+      "output": "out"
+    }
+  },
+  "dependencies": {
+    "electron-store": "^8.1.0",
+    "electron-log": "^5.0.0"
   },
   "devDependencies": {
-    "concurrently": "^9.0.0"
+    "concurrently": "^9.0.0",
+    "electron": "^28.0.0",
+    "electron-builder": "^24.9.1"
   }
 }
