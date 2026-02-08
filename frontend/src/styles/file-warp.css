@@ -18,17 +18,44 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 6px 10px;
+  padding: 4px 6px;
   border-bottom: 1px solid #00f0ff22;
   background: #0a0a14;
+  gap: 4px;
 }
 
-.fwp-title {
-  color: #00f0ff;
-  font-size: 11px;
+/* ─── Sidebar tab buttons ────────────────────────────────────── */
+
+.fwp-tabs {
+  display: flex;
+  gap: 2px;
+}
+
+.fwp-tab {
+  background: none;
+  border: 1px solid transparent;
+  color: #4a4a5e;
+  cursor: pointer;
+  padding: 2px 8px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px;
   font-weight: bold;
   letter-spacing: 1px;
+  border-radius: 2px;
 }
+
+.fwp-tab:hover {
+  color: #8888aa;
+  border-color: #4a4a5e;
+}
+
+.fwp-tab.active {
+  color: #00f0ff;
+  border-color: #00f0ff66;
+  background: #00f0ff0d;
+}
+
+/* ─── Refresh button ─────────────────────────────────────────── */
 
 .fwp-refresh {
   background: none;
@@ -38,12 +65,15 @@
   padding: 2px 6px;
   font-size: 13px;
   border-radius: 2px;
+  flex-shrink: 0;
 }
 
 .fwp-refresh:hover {
   border-color: #00f0ff;
   color: #00f0ff;
 }
+
+/* ─── File tree panel ────────────────────────────────────────── */
 
 .fwp-tree {
   flex: 1;
@@ -144,6 +174,165 @@
 .fwp-file-name:hover {
   color: #e0e0e0;
   text-decoration: underline;
+}
+
+/* ─── Quick Commands panel ───────────────────────────────────── */
+
+.fwp-commands {
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: 4px 0;
+}
+
+.fwp-commands::-webkit-scrollbar {
+  width: 4px;
+}
+
+.fwp-commands::-webkit-scrollbar-track {
+  background: #0a0a14;
+}
+
+.fwp-commands::-webkit-scrollbar-thumb {
+  background: #4a4a5e;
+  border-radius: 2px;
+}
+
+.fwp-cmd-add-row {
+  padding: 4px 8px;
+  border-bottom: 1px solid #00f0ff11;
+}
+
+.fwp-cmd-add-btn {
+  background: none;
+  border: 1px dashed #4a4a5e;
+  color: #8888aa;
+  cursor: pointer;
+  padding: 3px 10px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px;
+  font-weight: bold;
+  letter-spacing: 1px;
+  border-radius: 2px;
+  width: 100%;
+}
+
+.fwp-cmd-add-btn:hover {
+  border-color: #00f0ff;
+  color: #00f0ff;
+  border-style: solid;
+}
+
+/* ─── Command list items ─────────────────────────────────────── */
+
+.fwp-cmd-list {
+  padding: 2px 0;
+}
+
+.fwp-cmd-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 4px 8px;
+  cursor: pointer;
+}
+
+.fwp-cmd-item:hover {
+  background: #00f0ff0d;
+}
+
+.fwp-cmd-label {
+  color: #ffaa00;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  flex: 1;
+}
+
+.fwp-cmd-label:hover {
+  color: #ffcc44;
+  text-decoration: underline;
+}
+
+.fwp-cmd-del {
+  background: none;
+  border: none;
+  color: #4a4a5e;
+  cursor: pointer;
+  font-size: 14px;
+  padding: 0 2px;
+  line-height: 1;
+  flex-shrink: 0;
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+
+.fwp-cmd-item:hover .fwp-cmd-del {
+  opacity: 1;
+}
+
+.fwp-cmd-del:hover {
+  color: #ff0080;
+}
+
+/* ─── Add-command form ───────────────────────────────────────── */
+
+.fwp-cmd-form {
+  padding: 6px 8px;
+  border-bottom: 1px solid #00f0ff11;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.fwp-cmd-input {
+  background: #0a0a14;
+  border: 1px solid #4a4a5e;
+  color: #e0e0e0;
+  padding: 4px 6px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  border-radius: 2px;
+  outline: none;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.fwp-cmd-input:focus {
+  border-color: #00f0ff;
+}
+
+.fwp-cmd-input::placeholder {
+  color: #4a4a5e;
+}
+
+.fwp-cmd-form-actions {
+  display: flex;
+  gap: 4px;
+}
+
+.fwp-cmd-save,
+.fwp-cmd-cancel {
+  background: none;
+  border: 1px solid #4a4a5e;
+  color: #8888aa;
+  cursor: pointer;
+  padding: 2px 8px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px;
+  font-weight: bold;
+  border-radius: 2px;
+  flex: 1;
+}
+
+.fwp-cmd-save:hover {
+  border-color: #00f0ff;
+  color: #00f0ff;
+}
+
+.fwp-cmd-cancel:hover {
+  border-color: #ff0080;
+  color: #ff0080;
 }
 
 /* ─── Layout wrapper for terminal + sidebar ──────────────────── */

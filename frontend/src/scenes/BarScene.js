@@ -1278,7 +1278,7 @@ export default class BarScene extends Phaser.Scene {
     this.events.on('character-clicked', (data) => {
       if (this.dialogBox) {
         const meta = this.sessionMeta.get(data.sessionId) || {};
-        this.dialogBox.open(data.sessionId, meta.label, meta.state);
+        this.dialogBox.open(data.sessionId, meta.label, meta.state, meta.agentType);
       }
     });
 

@@ -6,7 +6,7 @@
  * Characters randomly switch poses every 3-8 seconds for liveliness.
  */
 
-import { POSE, CHARACTER_POSES, POSE_MIN_DURATION, POSE_MAX_DURATION, WALK_SPEED, CHARACTER_VARIANT_COUNT } from '../config/animations.js';
+import { POSE, CHARACTER_POSES, POSE_MIN_DURATION, POSE_MAX_DURATION, CHARACTER_VARIANT_COUNT } from '../config/animations.js';
 import { DOOR_POSITION } from '../config/seats.js';
 import { BUBBLE_ENABLED } from '../config/bubbles.js';
 import SpeechBubble from './SpeechBubble.js';
@@ -108,26 +108,23 @@ export default class Character {
     // Set walk frame
     this.setPoseFrame('walk');
 
-    const distance = Phaser.Math.Distance.Between(
-      this.sprite.x, this.sprite.y,
-      this.seat.x, this.seat.y
-    );
-    const duration = (distance / WALK_SPEED) * 1000;
+    // Fixed 1s walk regardless of distance
+    const duration = 1000;
 
     // Walk tween
     this.scene.tweens.add({
       targets: this.sprite,
       x: this.seat.x,
       y: this.seat.y,
-      duration: Math.max(duration, 400),
-      ease: 'Power1',
+      duration,
+      ease: 'Power2',
     });
 
     this.scene.tweens.add({
       targets: this.nameText,
       x: this.seat.x,
       y: this.seat.y + 6,
-      duration: Math.max(duration, 400),
+      duration,
       ease: 'Power1',
       onComplete: () => {
         this.onSeated();

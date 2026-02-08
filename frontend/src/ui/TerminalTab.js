@@ -36,6 +36,7 @@ export default class TerminalTab {
 
   constructor(sessionId) {
     this.sessionId = sessionId;
+    this.agentType = 'claude'; // set externally after getOrCreate()
     this.el = null;
     this.term = null;
     this.fitAddon = null;
@@ -106,8 +107,10 @@ export default class TerminalTab {
     this.wrapper.className = 'terminal-with-sidebar';
     container.appendChild(this.wrapper);
 
-    // File Warp sidebar
-    this.fileWarpPanel = new FileWarpPanel(this.sessionId);
+    // File Warp sidebar (with quick-commands tab)
+    this.fileWarpPanel = new FileWarpPanel(this.sessionId, this.agentType, () => {
+      this.term?.focus();
+    });
     this.fileWarpPanel.render(this.wrapper);
 
     // Terminal container

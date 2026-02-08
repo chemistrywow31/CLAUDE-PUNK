@@ -110,7 +110,7 @@ export default class HotkeyManager {
       const sessionId = this.letterToSession.get(letter);
       const meta = this.scene.sessionMeta.get(sessionId) || {};
       if (this.dialogBox) {
-        this.dialogBox.open(sessionId, meta.label, meta.state);
+        this.dialogBox.open(sessionId, meta.label, meta.state, meta.agentType);
       }
     }
   }

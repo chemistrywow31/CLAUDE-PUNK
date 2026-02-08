@@ -88,7 +88,7 @@ export default class DialogBox {
     });
   }
 
-  open(sessionId, label, state) {
+  open(sessionId, label, state, agentType) {
     this.currentSessionId = sessionId;
     this.visible = true;
 
@@ -123,8 +123,10 @@ export default class DialogBox {
     this.detachTabs();
 
     // Build tab set — reuse cached TerminalTab, fresh instances for others
+    const termTab = TerminalTab.getOrCreate(sessionId);
+    termTab.agentType = agentType || 'claude';
     this.tabs = {
-      cli: TerminalTab.getOrCreate(sessionId),
+      cli: termTab,
       files: new FilesTab(sessionId),
       claude: new ClaudeConfigTab(sessionId),
     };
