@@ -6,7 +6,7 @@
 
 import { Menu } from 'electron';
 
-export function createMenu(onPreferences, app) {
+export function createMenu(onPreferences, onRestart, app) {
   const template = [
     {
       label: 'CLAUDE PUNK',
@@ -20,6 +20,11 @@ export function createMenu(onPreferences, app) {
           label: 'Preferences...',
           accelerator: 'CmdOrCtrl+,',
           click: onPreferences,
+        },
+        {
+          label: 'Restart Services',
+          accelerator: 'CmdOrCtrl+Shift+R',
+          click: onRestart,
         },
         { type: 'separator' },
         {

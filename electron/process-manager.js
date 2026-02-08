@@ -2,7 +2,10 @@
  * CLAUDE PUNK - Process Manager
  *
  * Manages backend (Node.js server) and frontend (Vite dev server) child processes.
- * Injects configuration via environment variables.
+ * Features:
+ * - Auto-start services on app launch
+ * - Port conflict detection (no duplicate services)
+ * - Graceful shutdown on app quit
  */
 
 import { spawn } from 'node:child_process';
@@ -19,56 +22,82 @@ const PROJECT_ROOT = path.join(__dirname, '..');
 
 let backendProcess = null;
 let frontendProcess = null;
+let isShuttingDown = false;
 
-// ──── Utility: Wait for Port ───────────────────────────────────────────────
+// ──── Port Checking ─────────────────────────────────────────────────────────
 
+/**
+ * Check if a port is already in use and responding
+ * @param {number} port - Port to check
+ * @returns {Promise<boolean>} - true if port is in use and responding
+ */
+async function checkPortInUse(port) {
+  return new Promise((resolve) => {
+    const req = http.get(`http://127.0.0.1:${port}`, (res) => {
+      res.resume();
+      resolve(true); // Port is in use and responding
+    });
+
+    req.on('error', () => {
+      resolve(false); // Port is not in use or not responding
+    });
+
+    req.on('timeout', () => {
+      req.destroy();
+      resolve(false);
+    });
+
+    req.setTimeout(1000);
+    req.end();
+  });
+}
+
+/**
+ * Wait for a service to be ready by polling the port
+ * @param {number} port - Port to check
+ * @param {number} maxAttempts - Maximum number of attempts
+ * @param {number} intervalMs - Interval between attempts
+ * @returns {Promise<boolean>} - true if service became ready
+ */
 async function waitForPort(port, maxAttempts = 30, intervalMs = 1000) {
   for (let i = 0; i < maxAttempts; i++) {
-    try {
-      await new Promise((resolve, reject) => {
-        // Use 127.0.0.1 to force IPv4 (avoid IPv6 ::1 which may not be bound)
-        const req = http.get(`http://127.0.0.1:${port}`, (res) => {
-          res.resume(); // Consume response data
-          resolve();
-        });
-        req.on('error', (err) => {
-          reject(err);
-        });
-        req.on('timeout', () => {
-          req.destroy();
-          reject(new Error('Request timeout'));
-        });
-        req.setTimeout(1000); // 1 second timeout
-        req.end();
-      });
-      log.info(`✓ Port ${port} is now available (attempt ${i + 1}/${maxAttempts})`);
+    const ready = await checkPortInUse(port);
+    if (ready) {
+      log.info(`✓ Port ${port} is ready (attempt ${i + 1}/${maxAttempts})`);
       return true;
-    } catch (error) {
-      if (i === maxAttempts - 1) {
-        log.error(`✗ Port ${port} did not become available after ${maxAttempts} attempts`);
-        log.error(`Last error:`, error.message);
-        throw new Error(`Port ${port} did not become available after ${maxAttempts} attempts`);
-      }
-      if ((i + 1) % 5 === 0) {
-        log.info(`⏳ Still waiting for port ${port}... (attempt ${i + 1}/${maxAttempts}) - error: ${error.message}`);
-      }
-      await new Promise((resolve) => setTimeout(resolve, intervalMs));
     }
+
+    if ((i + 1) % 5 === 0) {
+      log.info(`⏳ Waiting for port ${port}... (attempt ${i + 1}/${maxAttempts})`);
+    }
+
+    await new Promise((resolve) => setTimeout(resolve, intervalMs));
   }
+
+  log.error(`✗ Port ${port} did not become available after ${maxAttempts} attempts`);
   return false;
 }
 
 // ──── Start Backend ─────────────────────────────────────────────────────────
 
 export async function startBackend(config) {
+  // Check if backend is already running
   if (backendProcess) {
-    log.warn('Backend already running');
-    return;
+    log.warn('Backend process already running (PID: ' + backendProcess.pid + ')');
+    return true;
+  }
+
+  // Check if port is already in use (maybe started externally)
+  const portInUse = await checkPortInUse(config.backend.port);
+  if (portInUse) {
+    log.info(`✅ Backend port ${config.backend.port} already in use - reusing existing service`);
+    return true;
   }
 
   const backendDir = path.join(PROJECT_ROOT, 'backend');
 
-  log.info('Spawning backend process...');
+  log.info(`🚀 Starting backend on port ${config.backend.port}...`);
+
   backendProcess = spawn('node', ['server.js'], {
     cwd: backendDir,
     env: {
@@ -81,105 +110,212 @@ export async function startBackend(config) {
     stdio: 'pipe',
   });
 
+  // Log backend output
   backendProcess.stdout.on('data', (data) => {
     log.info('[Backend]', data.toString().trim());
   });
 
   backendProcess.stderr.on('data', (data) => {
-    log.error('[Backend]', data.toString().trim());
+    log.error('[Backend Error]', data.toString().trim());
   });
 
-  backendProcess.on('exit', (code, signal) => {
-    log.warn(`Backend exited with code ${code}, signal ${signal}`);
+  backendProcess.on('error', (error) => {
+    log.error('Failed to start backend:', error);
     backendProcess = null;
   });
 
-  // Give backend a moment to initialize
-  await new Promise((resolve) => setTimeout(resolve, 500));
+  backendProcess.on('exit', (code, signal) => {
+    if (!isShuttingDown) {
+      log.error(`Backend exited unexpectedly. Code: ${code}, Signal: ${signal}`);
+    } else {
+      log.info('Backend stopped gracefully');
+    }
+    backendProcess = null;
+  });
 
   // Wait for backend to be ready
   log.info(`Waiting for backend on port ${config.backend.port}...`);
-  await waitForPort(config.backend.port);
-  log.info('Backend ready');
+  const ready = await waitForPort(config.backend.port, 20, 500);
+
+  if (!ready) {
+    log.error('❌ Backend failed to start within timeout');
+    if (backendProcess) {
+      backendProcess.kill('SIGTERM');
+      backendProcess = null;
+    }
+    return false;
+  }
+
+  log.info('✅ Backend started successfully (PID: ' + backendProcess.pid + ')');
+  return true;
 }
 
 // ──── Start Frontend ────────────────────────────────────────────────────────
 
 export async function startFrontend(config) {
+  // Check if frontend is already running
   if (frontendProcess) {
-    log.warn('Frontend already running');
-    return;
+    log.warn('Frontend process already running (PID: ' + frontendProcess.pid + ')');
+    return true;
+  }
+
+  // Check if port is already in use (maybe started externally)
+  const portInUse = await checkPortInUse(config.frontend.port);
+  if (portInUse) {
+    log.info(`✅ Frontend port ${config.frontend.port} already in use - reusing existing service`);
+    return true;
   }
 
   const frontendDir = path.join(PROJECT_ROOT, 'frontend');
 
-  log.info('Spawning frontend process...');
+  log.info(`🚀 Starting frontend on port ${config.frontend.port}...`);
+
   frontendProcess = spawn('npm', ['run', 'dev'], {
     cwd: frontendDir,
     env: {
       ...process.env,
       VITE_PORT: config.frontend.port.toString(),
-      BACKEND_URL: `http://localhost:${config.backend.port}`,
+      BACKEND_URL: `http://127.0.0.1:${config.backend.port}`,
     },
     stdio: 'pipe',
     shell: true,
   });
 
+  // Log frontend output
   frontendProcess.stdout.on('data', (data) => {
     log.info('[Frontend]', data.toString().trim());
   });
 
   frontendProcess.stderr.on('data', (data) => {
-    // Vite logs to stderr, so we treat it as info
-    log.info('[Frontend]', data.toString().trim());
+    // Vite logs to stderr by default, so don't treat everything as error
+    const output = data.toString().trim();
+    if (output.toLowerCase().includes('error')) {
+      log.error('[Frontend Error]', output);
+    } else {
+      log.info('[Frontend]', output);
+    }
   });
 
-  frontendProcess.on('exit', (code, signal) => {
-    log.warn(`Frontend exited with code ${code}, signal ${signal}`);
+  frontendProcess.on('error', (error) => {
+    log.error('Failed to start frontend:', error);
     frontendProcess = null;
   });
 
-  // Give frontend a moment to initialize
-  await new Promise((resolve) => setTimeout(resolve, 1000));
+  frontendProcess.on('exit', (code, signal) => {
+    if (!isShuttingDown) {
+      log.error(`Frontend exited unexpectedly. Code: ${code}, Signal: ${signal}`);
+    } else {
+      log.info('Frontend stopped gracefully');
+    }
+    frontendProcess = null;
+  });
 
   // Wait for frontend to be ready (Vite takes longer to start)
   log.info(`Waiting for frontend on port ${config.frontend.port}...`);
-  await waitForPort(config.frontend.port, 60, 1000); // 60 seconds timeout for Vite
-  log.info('Frontend ready');
+  const ready = await waitForPort(config.frontend.port, 60, 1000);
+
+  if (!ready) {
+    log.error('❌ Frontend failed to start within timeout');
+    if (frontendProcess) {
+      frontendProcess.kill('SIGTERM');
+      frontendProcess = null;
+    }
+    return false;
+  }
+
+  log.info('✅ Frontend started successfully (PID: ' + frontendProcess.pid + ')');
+  return true;
+}
+
+// ──── Start All ─────────────────────────────────────────────────────────────
+
+/**
+ * Start both backend and frontend services
+ * @param {Object} config - Configuration object
+ * @returns {Promise<{backend: boolean, frontend: boolean}>}
+ */
+export async function startAll(config) {
+  log.info('🚀 Starting all services...');
+
+  const backendStarted = await startBackend(config);
+  if (!backendStarted) {
+    log.error('❌ Failed to start backend');
+    return { backend: false, frontend: false };
+  }
+
+  const frontendStarted = await startFrontend(config);
+  if (!frontendStarted) {
+    log.error('❌ Failed to start frontend');
+    // Backend started but frontend failed - decide whether to keep backend running
+    // For now, keep backend running as it might be useful for debugging
+    return { backend: true, frontend: false };
+  }
+
+  log.info('✅ All services started successfully');
+  return { backend: true, frontend: true };
 }
 
 // ──── Stop All ──────────────────────────────────────────────────────────────
 
-export function stopAll() {
-  log.info('Stopping all processes...');
-
-  if (backendProcess) {
-    log.info('Killing backend process...');
-    backendProcess.kill('SIGTERM');
-    backendProcess = null;
-  }
+/**
+ * Stop all services gracefully
+ */
+export async function stopAll() {
+  log.info('🛑 Stopping all services...');
+  isShuttingDown = true;
 
   if (frontendProcess) {
-    log.info('Killing frontend process...');
+    log.info('Stopping frontend...');
     frontendProcess.kill('SIGTERM');
     frontendProcess = null;
   }
 
-  log.info('All processes stopped');
+  if (backendProcess) {
+    log.info('Stopping backend...');
+    backendProcess.kill('SIGTERM');
+    backendProcess = null;
+  }
+
+  // Give processes time to clean up
+  await new Promise(resolve => setTimeout(resolve, 1000));
+
+  log.info('All services stopped');
 }
 
 // ──── Restart All ───────────────────────────────────────────────────────────
 
+/**
+ * Restart all services
+ * @param {Object} config - Configuration object
+ * @returns {Promise<{backend: boolean, frontend: boolean}>}
+ */
 export async function restartAll(config) {
-  log.info('Restarting all processes...');
+  log.info('🔄 Restarting all services...');
 
-  stopAll();
+  await stopAll();
 
   // Wait a bit for ports to be released
   await new Promise((resolve) => setTimeout(resolve, 2000));
 
-  await startBackend(config);
-  await startFrontend(config);
+  isShuttingDown = false;
+  return startAll(config);
+}
 
-  log.info('All processes restarted');
+// ──── Get Status ────────────────────────────────────────────────────────────
+
+/**
+ * Get the current status of services
+ * @returns {Object} - Status of backend and frontend processes
+ */
+export function getStatus() {
+  return {
+    backend: {
+      running: backendProcess !== null,
+      pid: backendProcess?.pid,
+    },
+    frontend: {
+      running: frontendProcess !== null,
+      pid: frontendProcess?.pid,
+    },
+  };
 }

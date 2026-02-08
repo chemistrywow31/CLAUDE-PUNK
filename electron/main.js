@@ -1,22 +1,19 @@
 /**
- * CLAUDE PUNK - Electron Main Process (Window + Settings Manager)
+ * CLAUDE PUNK - Electron Main Process
  *
- * This app does NOT manage backend/frontend processes.
- * User should start services manually with ./start.sh
- *
- * Manages:
- * - Application window creation
- * - Configuration management (ports, paths)
- * - Application menu
+ * Auto-starts backend and frontend services with intelligent port management:
+ * - Detects if services are already running (no duplicate processes)
+ * - Gracefully shuts down services on app quit
+ * - Manages application window and configuration
  */
 
 import { app, BrowserWindow, Menu, dialog } from 'electron';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import http from 'node:http';
 import log from 'electron-log';
 import { loadConfig, saveConfig } from './config-manager.js';
 import { createMenu } from './menu.js';
+import { startAll, stopAll, restartAll, getStatus } from './process-manager.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -24,29 +21,12 @@ const __dirname = path.dirname(__filename);
 // ──── Global State ──────────────────────────────────────────────────────────
 
 let mainWindow = null;
+let servicesStarted = false;
 
 // ──── Logging Setup ─────────────────────────────────────────────────────────
 
 log.transports.file.level = 'info';
-log.info('CLAUDE PUNK starting...');
-
-// ──── Utility: Check if Port is Open ───────────────────────────────────────
-
-async function checkPort(port) {
-  return new Promise((resolve) => {
-    const req = http.get(`http://127.0.0.1:${port}`, (res) => {
-      res.resume();
-      resolve(true);
-    });
-    req.on('error', () => resolve(false));
-    req.on('timeout', () => {
-      req.destroy();
-      resolve(false);
-    });
-    req.setTimeout(1000);
-    req.end();
-  });
-}
+log.info('🎮 CLAUDE PUNK starting...');
 
 // ──── Main Window Creation ──────────────────────────────────────────────────
 
@@ -76,8 +56,8 @@ function createWindow() {
     dialog.showErrorBox(
       'Connection Error',
       `Failed to connect to frontend at ${frontendURL}\n\n` +
-      `Make sure ./start.sh is running.\n\n` +
-      `Error: ${err.message}`
+      `Error: ${err.message}\n\n` +
+      `This might be a temporary issue. The frontend may still be starting up.`
     );
   });
 
@@ -98,63 +78,77 @@ app.whenReady().then(async () => {
 
   // Load config
   const config = loadConfig();
-  log.info('Config loaded:', config);
+  log.info('Config loaded:', JSON.stringify(config, null, 2));
 
   // Create menu
-  const menu = createMenu(handlePreferences, app);
+  const menu = createMenu(handlePreferences, handleRestart, app);
   Menu.setApplicationMenu(menu);
 
-  // Check if backend and frontend are already running
-  log.info('Checking if services are running...');
-  const backendRunning = await checkPort(config.backend.port);
-  const frontendRunning = await checkPort(config.frontend.port);
+  // Start services automatically
+  log.info('🚀 Starting services...');
 
-  log.info(`Backend (port ${config.backend.port}): ${backendRunning ? '✅' : '❌'}`);
-  log.info(`Frontend (port ${config.frontend.port}): ${frontendRunning ? '✅' : '❌'}`);
+  try {
+    const result = await startAll(config);
 
-  if (!backendRunning || !frontendRunning) {
-    log.warn('Services not detected. Showing startup instructions...');
-    const result = await dialog.showMessageBox({
-      type: 'warning',
-      title: 'Services Not Running',
-      message: 'CLAUDE PUNK requires backend and frontend services',
-      detail: `Please start the services first:\n\n` +
-              `   cd ${process.cwd()}\n` +
-              `   ./start.sh\n\n` +
-              `Status:\n` +
-              `   Backend (port ${config.backend.port}): ${backendRunning ? '✅ Running' : '❌ Not running'}\n` +
-              `   Frontend (port ${config.frontend.port}): ${frontendRunning ? '✅ Running' : '❌ Not running'}\n\n` +
-              `After starting services, click "Retry".`,
-      buttons: ['Retry', 'Quit', 'Open Terminal'],
-      defaultId: 0,
-    });
+    if (result.backend && result.frontend) {
+      servicesStarted = true;
+      log.info('✅ All services started successfully');
 
-    if (result.response === 0) {
-      // Retry - relaunch app
-      app.relaunch();
-      app.quit();
-      return;
-    } else if (result.response === 2) {
-      // Open terminal at project directory
-      const { spawn } = await import('node:child_process');
-      spawn('open', ['-a', 'Terminal', process.cwd()]);
-      app.quit();
-      return;
+      // Give services a moment to stabilize
+      await new Promise(resolve => setTimeout(resolve, 1000));
+
+      // Create window
+      createWindow();
+
+      // Open external browser if configured
+      if (config.app.openBrowserOnStart) {
+        log.info('Opening external browser...');
+        const { shell } = await import('electron');
+        shell.openExternal(`http://127.0.0.1:${config.frontend.port}`);
+      }
     } else {
-      // Quit
+      // Services failed to start
+      log.error('❌ Failed to start services');
+
+      const errorResult = await dialog.showMessageBox({
+        type: 'error',
+        title: 'Startup Failed',
+        message: 'Failed to start CLAUDE PUNK services',
+        detail: `Status:\n` +
+                `   Backend: ${result.backend ? '✅ Running' : '❌ Failed'}\n` +
+                `   Frontend: ${result.frontend ? '✅ Running' : '❌ Failed'}\n\n` +
+                `Possible causes:\n` +
+                `   - Ports ${config.backend.port} or ${config.frontend.port} are in use by another app\n` +
+                `   - Node.js or npm not properly installed\n` +
+                `   - Missing dependencies (run 'npm install' in backend and frontend)\n\n` +
+                `Check the log file for details:\n` +
+                `${log.transports.file.getFile().path}`,
+        buttons: ['Quit', 'Open Log', 'Retry'],
+        defaultId: 2,
+      });
+
+      if (errorResult.response === 1) {
+        // Open log file
+        const { shell } = await import('electron');
+        shell.showItemInFolder(log.transports.file.getFile().path);
+      } else if (errorResult.response === 2) {
+        // Retry
+        app.relaunch();
+      }
+
       app.quit();
       return;
     }
-  }
+  } catch (error) {
+    log.error('Unexpected error during startup:', error);
 
-  log.info('✅ Services detected! Creating window...');
-  createWindow();
+    await dialog.showErrorBox(
+      'Startup Error',
+      `An unexpected error occurred:\n\n${error.message}\n\nCheck the log file for details.`
+    );
 
-  // Open external browser if configured
-  if (config.app.openBrowserOnStart) {
-    log.info('Opening external browser...');
-    const { shell } = await import('electron');
-    shell.openExternal(`http://127.0.0.1:${config.frontend.port}`);
+    app.quit();
+    return;
   }
 });
 
@@ -167,7 +161,21 @@ app.on('activate', () => {
 
 app.on('window-all-closed', () => {
   // macOS: keep app running when all windows closed
+  // Services will keep running until app quits
   if (process.platform !== 'darwin') {
+    app.quit();
+  }
+});
+
+app.on('before-quit', async (event) => {
+  if (servicesStarted) {
+    log.info('App quitting, stopping services...');
+    event.preventDefault();
+
+    await stopAll();
+    servicesStarted = false;
+
+    // Now actually quit
     app.quit();
   }
 });
@@ -176,6 +184,7 @@ app.on('window-all-closed', () => {
 
 async function handlePreferences() {
   const config = loadConfig();
+  const status = getStatus();
 
   // Show settings dialog
   const result = await dialog.showMessageBox({
@@ -189,11 +198,15 @@ Frontend Port: ${config.frontend.port}
 Claude CLI Path: ${config.backend.claudePath}
 Auto-run Claude: ${config.backend.autoRunClaude ? 'Yes' : 'No'}
 
+Services Status:
+Backend: ${status.backend.running ? `✅ Running (PID: ${status.backend.pid})` : '❌ Not running'}
+Frontend: ${status.frontend.running ? `✅ Running (PID: ${status.frontend.pid})` : '❌ Not running'}
+
 Config file location:
 ${app.getPath('userData')}/config.json
 
-Note: After changing ports, restart ./start.sh for changes to take effect.`,
-    buttons: ['OK', 'Open Config File', 'Edit Ports...'],
+Note: After changing configuration, use "Restart Services" from the menu.`,
+    buttons: ['OK', 'Open Config File', 'Restart Services'],
   });
 
   if (result.response === 1) {
@@ -201,33 +214,58 @@ Note: After changing ports, restart ./start.sh for changes to take effect.`,
     const { shell } = await import('electron');
     shell.showItemInFolder(path.join(app.getPath('userData'), 'config.json'));
   } else if (result.response === 2) {
-    // Edit ports (simple prompt for now, can be improved with proper dialog)
-    await editPorts(config);
+    // Restart services
+    await handleRestart();
   }
 }
 
-async function editPorts(config) {
-  const result = await dialog.showMessageBox({
+async function handleRestart() {
+  const config = loadConfig();
+
+  log.info('User requested service restart');
+
+  const confirmResult = await dialog.showMessageBox({
     type: 'question',
-    title: 'Edit Ports',
-    message: 'Change Port Configuration',
-    detail: `Current ports:
-  Backend: ${config.backend.port}
-  Frontend: ${config.frontend.port}
-
-To change ports:
-1. Edit the config file manually
-2. Restart ./start.sh with new ports
-3. Relaunch this app
-
-Open config file now?`,
-    buttons: ['Cancel', 'Open Config File'],
+    title: 'Restart Services',
+    message: 'Restart backend and frontend services?',
+    detail: 'This will stop and restart both services with the current configuration.',
+    buttons: ['Cancel', 'Restart'],
+    defaultId: 1,
   });
 
-  if (result.response === 1) {
-    const { shell } = await import('electron');
-    const configPath = path.join(app.getPath('userData'), 'config.json');
-    shell.showItemInFolder(configPath);
+  if (confirmResult.response !== 1) {
+    return;
+  }
+
+  try {
+    log.info('Restarting services...');
+
+    const result = await restartAll(config);
+
+    if (result.backend && result.frontend) {
+      dialog.showMessageBox({
+        type: 'info',
+        title: 'Restart Complete',
+        message: 'Services restarted successfully',
+        buttons: ['OK'],
+      });
+
+      // Reload window
+      if (mainWindow) {
+        mainWindow.reload();
+      }
+    } else {
+      dialog.showMessageBox({
+        type: 'error',
+        title: 'Restart Failed',
+        message: 'Failed to restart services',
+        detail: `Backend: ${result.backend ? '✅' : '❌'}\nFrontend: ${result.frontend ? '✅' : '❌'}`,
+        buttons: ['OK'],
+      });
+    }
+  } catch (error) {
+    log.error('Error restarting services:', error);
+    dialog.showErrorBox('Restart Error', `Failed to restart services:\n\n${error.message}`);
   }
 }
 
