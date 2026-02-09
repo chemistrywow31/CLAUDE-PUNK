@@ -16,6 +16,8 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { EventEmitter } from 'node:events';
 import http from 'node:http';
+import { exec } from 'node:child_process';
+import os from 'node:os';
 
 // ─── Section 1: Config ───────────────────────────────────────────────────────
 
@@ -81,6 +83,33 @@ class RingBuffer {
     return result;
   }
 }
+
+// ─── Log Buffer ──────────────────────────────────────────────────────────────
+
+const logBuffer = new RingBuffer(1000); // Store last 1000 log entries
+
+// Override console methods to capture logs
+const originalLog = console.log.bind(console);
+const originalWarn = console.warn.bind(console);
+const originalError = console.error.bind(console);
+
+console.log = (...args) => {
+  const message = args.map(arg => typeof arg === 'object' ? JSON.stringify(arg) : String(arg)).join(' ');
+  logBuffer.write({ timestamp: new Date().toISOString(), level: 'info', message });
+  originalLog(...args);
+};
+
+console.warn = (...args) => {
+  const message = args.map(arg => typeof arg === 'object' ? JSON.stringify(arg) : String(arg)).join(' ');
+  logBuffer.write({ timestamp: new Date().toISOString(), level: 'warn', message });
+  originalWarn(...args);
+};
+
+console.error = (...args) => {
+  const message = args.map(arg => typeof arg === 'object' ? JSON.stringify(arg) : String(arg)).join(' ');
+  logBuffer.write({ timestamp: new Date().toISOString(), level: 'error', message });
+  originalError(...args);
+};
 
 // ─── Section 3: LineBuffer ───────────────────────────────────────────────────
 
@@ -809,6 +838,31 @@ function createRESTRouter(sessionManager, fileWatcher, broadcastFn) {
     sessionManager.kill(req.params.id);
     fileWatcher.unwatch(req.params.id);
     res.json({ ok: true });
+  });
+
+  // Get server logs
+  router.get('/logs', (_req, res) => {
+    const logs = logBuffer.readAll();
+    res.json({ logs });
+  });
+
+  // Read Electron main.log file content
+  router.get('/open-log', (_req, res) => {
+    // Electron log path: ~/Library/Logs/CLAUDE PUNK/main.log
+    const logPath = path.join(os.homedir(), 'Library', 'Logs', 'CLAUDE PUNK', 'main.log');
+
+    // Read log file content
+    fs.readFile(logPath, 'utf8', (error, data) => {
+      if (error) {
+        console.error('Failed to read log file:', error);
+        return res.status(500).json({
+          success: false,
+          error: 'Failed to read log file',
+          message: error.message
+        });
+      }
+      res.json({ success: true, content: data });
+    });
   });
 
   return router;
