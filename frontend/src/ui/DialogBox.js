@@ -76,12 +76,7 @@ export default class DialogBox {
     // Listen for session state changes
     wsService.on('session.terminated', (payload) => {
       if (payload.sessionId === this.currentSessionId) {
-        const statusEl = this.overlay.querySelector('#dialog-status');
-        statusEl.textContent = 'terminated';
-        statusEl.className = 'status-badge terminated';
-        this.overlay.querySelector('#prompt-input').disabled = true;
-        this.overlay.querySelector('#prompt-send').disabled = true;
-        this.overlay.querySelector('#dialog-kill').classList.add('hidden');
+        this.close();
       }
       // Fully tear down the cached terminal for this session
       TerminalTab.purge(payload.sessionId);
