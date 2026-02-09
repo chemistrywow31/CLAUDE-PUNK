@@ -31,7 +31,10 @@ class WebSocketService {
       this.ws = null;
     }
 
-    const wsUrl = url || `ws://${window.location.host}/ws`;
+    // In development, connect directly to backend (bypass Vite proxy issues)
+    const isDev = import.meta.env.DEV;
+    const wsUrl = url || (isDev ? 'ws://localhost:3000/ws' : `ws://${window.location.host}/ws`);
+    console.log('[WS] Connecting to:', wsUrl);
     this.ws = new WebSocket(wsUrl);
 
     this.ws.onopen = () => {
