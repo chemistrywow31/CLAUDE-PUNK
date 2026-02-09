@@ -144,8 +144,9 @@ export default class FolderPicker {
     // Navigate to last-used path or HOME
     const recent = this.getRecentFolders();
     const startPath = recent.length > 0 ? recent[0].path : '';
-    // Start with parent of last-used folder (or let backend default to $HOME)
-    const browsePath = startPath ? startPath.replace(/\/[^/]+\/?$/, '') || '/' : '';
+    // Start with parent of last-used folder (or let backend default to $HOME / %USERPROFILE%)
+    // Handles both Unix (/) and Windows (\) path separators
+    const browsePath = startPath ? startPath.replace(/[/\\][^/\\]+[/\\]?$/, '') || '' : '';
     this.navigateTo(browsePath);
 
     // Focus path input
@@ -363,7 +364,7 @@ export default class FolderPicker {
     const agentRadio = this.overlay.querySelector('input[name="fp-agent"]:checked');
 
     const workDir = pathInput.value.trim();
-    const label = labelInput.value.trim() || workDir.split('/').pop() || 'session';
+    const label = labelInput.value.trim() || workDir.split(/[/\\]/).pop() || 'session';
     const agentType = agentRadio ? agentRadio.value : 'claude';
 
     if (!workDir) {
@@ -377,6 +378,29 @@ export default class FolderPicker {
       this.showError('Not connected to server. Check if the backend is running.');
       return;
     }
+
+    // Listen for spawn errors before closing the dialog
+    const onSpawnError = (payload) => {
+      if (payload.code === 'SPAWN_FAILED' || payload.code === 'INVALID_MESSAGE' || payload.code === 'MAX_SESSIONS') {
+        console.error(`[FolderPicker] Session creation failed: ${payload.message}`);
+        this.show();
+        this.showError(payload.message);
+        wsService.off('error', onSpawnError);
+        wsService.off('session.update', onSpawnSuccess);
+      }
+    };
+    const onSpawnSuccess = () => {
+      wsService.off('error', onSpawnError);
+      wsService.off('session.update', onSpawnSuccess);
+    };
+    wsService.on('error', onSpawnError);
+    wsService.on('session.update', onSpawnSuccess);
+
+    // Auto-cleanup listener after 5s to avoid memory leak
+    setTimeout(() => {
+      wsService.off('error', onSpawnError);
+      wsService.off('session.update', onSpawnSuccess);
+    }, 5000);
 
     // Save to recent folders
     this.addRecentFolder(workDir, label);

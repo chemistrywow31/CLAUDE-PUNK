@@ -20,13 +20,34 @@ import http from 'node:http';
 
 // ─── Section 1: Config ───────────────────────────────────────────────────────
 
-/** Resolve a CLI command to its absolute path via `which`, falling back to the bare name. */
+const IS_WINDOWS = process.platform === 'win32';
+
+/** Resolve a CLI command to its absolute path, falling back to the bare name. */
 function resolveCommand(name) {
   try {
-    return execSync(`which ${name}`, { encoding: 'utf8' }).trim();
+    const cmd = IS_WINDOWS ? `where ${name}` : `which ${name}`;
+    const result = execSync(cmd, { encoding: 'utf8' }).trim();
+    // `where` on Windows may return multiple lines; take the first
+    return result.split(/\r?\n/)[0];
   } catch {
+    console.warn(`[config] Could not resolve command "${name}" — using bare name as fallback`);
     return name;
   }
+}
+
+/** Detect the default shell for the current platform. */
+function detectShell() {
+  if (IS_WINDOWS) {
+    // Prefer PowerShell if available, fall back to cmd.exe
+    return process.env.COMSPEC || 'cmd.exe';
+  }
+  return process.env.SHELL || '/bin/zsh';
+}
+
+/** Get shell arguments for the current platform. */
+function getShellArgs() {
+  if (IS_WINDOWS) return [];          // cmd.exe / powershell don't use -l
+  return ['-l'];                       // Unix login shell
 }
 
 const CONFIG = {
@@ -35,7 +56,8 @@ const CONFIG = {
   maxSessions: 16,
   fileCountRatio: 20,
   autoRunClaude: process.env.AUTO_RUN_CLAUDE !== 'false',
-  shell: process.env.SHELL || '/bin/zsh',
+  shell: detectShell(),
+  shellArgs: getShellArgs(),
   lineBufferFlushMs: 100,
   heartbeatIntervalMs: 30_000,
   ringBufferCapacity: 1000,
@@ -248,28 +270,49 @@ class SessionManager extends EventEmitter {
   }
 
   create(workDir, label, agentType = 'claude') {
+    console.log(`[session] Creating session: workDir="${workDir}", label="${label}", agentType="${agentType}"`);
+
     // Validate
     if (!workDir) throw new Error('workDir is required');
-    if (!fs.existsSync(workDir)) throw new Error(`workDir does not exist: ${workDir}`);
-    if (!fs.statSync(workDir).isDirectory()) throw new Error(`workDir is not a directory: ${workDir}`);
+    if (!fs.existsSync(workDir)) {
+      console.error(`[session] workDir does not exist: "${workDir}"`);
+      throw new Error(`workDir does not exist: ${workDir}`);
+    }
+    if (!fs.statSync(workDir).isDirectory()) {
+      console.error(`[session] workDir is not a directory: "${workDir}"`);
+      throw new Error(`workDir is not a directory: ${workDir}`);
+    }
     if (this.sessions.size >= CONFIG.maxSessions) {
       throw new Error(`Maximum sessions (${CONFIG.maxSessions}) reached`);
     }
     if (!CONFIG.agentCommands[agentType]) {
+      console.error(`[session] Unknown agentType: "${agentType}", available: ${Object.keys(CONFIG.agentCommands).join(', ')}`);
       throw new Error(`Unknown agentType: ${agentType}`);
     }
 
     const id = crypto.randomUUID();
     const createdAt = new Date().toISOString();
 
-    // Spawn PTY with login shell
-    const proc = pty.spawn(CONFIG.shell, ['-l'], {
-      name: 'xterm-256color',
-      cwd: workDir,
-      cols: CONFIG.ptyDefaultCols,
-      rows: CONFIG.ptyDefaultRows,
-      env: { ...process.env, TERM: 'xterm-256color' },
-    });
+    // Spawn PTY
+    console.log(`[session] Spawning PTY: shell="${CONFIG.shell}", args=${JSON.stringify(CONFIG.shellArgs)}, cwd="${workDir}"`);
+    let proc;
+    try {
+      proc = pty.spawn(CONFIG.shell, CONFIG.shellArgs, {
+        name: 'xterm-256color',
+        cwd: workDir,
+        cols: CONFIG.ptyDefaultCols,
+        rows: CONFIG.ptyDefaultRows,
+        env: { ...process.env, TERM: 'xterm-256color' },
+      });
+      console.log(`[session] PTY spawned successfully (pid=${proc.pid})`);
+    } catch (spawnErr) {
+      console.error(`[session] PTY spawn FAILED: ${spawnErr.message}`);
+      console.error(`[session]   shell: ${CONFIG.shell}`);
+      console.error(`[session]   args: ${JSON.stringify(CONFIG.shellArgs)}`);
+      console.error(`[session]   cwd: ${workDir}`);
+      console.error(`[session]   platform: ${process.platform}`);
+      throw new Error(`Failed to spawn terminal: ${spawnErr.message}`);
+    }
 
     const ringBuffer = new RingBuffer();
     const rawReplayBuffer = new RawReplayBuffer();
@@ -289,6 +332,7 @@ class SessionManager extends EventEmitter {
     });
 
     proc.onExit(({ exitCode }) => {
+      console.log(`[session] PTY exited: session=${id}, exitCode=${exitCode}`);
       lineBuffer.flush('stdout');
       lineBuffer.destroy();
 
@@ -334,7 +378,10 @@ class SessionManager extends EventEmitter {
       setTimeout(() => {
         if (session.state === 'active') {
           const cmd = CONFIG.agentCommands[agentType];
+          console.log(`[session] Auto-running agent command: "${cmd}" (session=${id})`);
           proc.write(cmd + '\n');
+        } else {
+          console.warn(`[session] Skipping auto-run — session ${id} already ${session.state}`);
         }
       }, CONFIG.autoRunDelayMs);
     }
@@ -364,21 +411,40 @@ class SessionManager extends EventEmitter {
     if (!session) return;
     if (session.state === 'terminated') return;
 
+    console.log(`[session] Killing session ${id} (pid=${session.proc.pid}, platform=${process.platform})`);
     session.state = 'terminated';
 
+    // Graceful kill
     try {
-      session.proc.kill('SIGTERM');
-    } catch {
-      // already dead
+      if (IS_WINDOWS) {
+        // Windows: node-pty kill() doesn't accept signals — use taskkill for
+        // graceful tree kill (kills child processes too)
+        try {
+          execSync(`taskkill /PID ${session.proc.pid} /T`, { timeout: 2000 });
+        } catch {
+          // taskkill may fail if process already exited; fall through to force kill
+          session.proc.kill();
+        }
+      } else {
+        session.proc.kill('SIGTERM');
+      }
+    } catch (err) {
+      console.warn(`[session] Graceful kill failed for ${id}: ${err.message}`);
     }
 
     // Force kill after 3s
     session._forceKillTimer = setTimeout(() => {
       session._forceKillTimer = null;
       try {
-        session.proc.kill('SIGKILL');
-      } catch {
-        // already dead
+        if (IS_WINDOWS) {
+          // /F = force, /T = tree (kill child processes)
+          execSync(`taskkill /PID ${session.proc.pid} /F /T`, { timeout: 2000 });
+        } else {
+          session.proc.kill('SIGKILL');
+        }
+        console.log(`[session] Force-killed session ${id}`);
+      } catch (err) {
+        console.warn(`[session] Force kill failed for ${id} (likely already dead): ${err.message}`);
       }
     }, 3000);
   }
@@ -806,7 +872,7 @@ function createWSS(server, sessionManager, fileWatcher) {
 
           case 'fs.browse': {
             const { path: dirPath } = msg.payload;
-            const targetPath = dirPath || process.env.HOME || '/';
+            const targetPath = dirPath || process.env.HOME || process.env.USERPROFILE || (IS_WINDOWS ? 'C:\\' : '/');
             try {
               const resolved = path.resolve(targetPath);
               const stat = await fs.promises.stat(resolved);
@@ -823,7 +889,9 @@ function createWSS(server, sessionManager, fileWatcher) {
                   if (!a.isDir && b.isDir) return 1;
                   return a.name.localeCompare(b.name);
                 });
-              const parent = resolved === '/' ? null : path.dirname(resolved);
+              // Root detection: Unix "/" or Windows "C:\"
+              const isRoot = resolved === '/' || /^[A-Z]:\\?$/i.test(resolved);
+              const parent = isRoot ? null : path.dirname(resolved);
               sendToClient(ws, 'fs.browse.result', { path: resolved, parent, entries: filtered });
             } catch (err) {
               sendToClient(ws, 'error', { message: `Cannot read directory: ${err.message}`, code: 'INVALID_PATH' });
@@ -1002,8 +1070,12 @@ function createWSS(server, sessionManager, fileWatcher) {
         const code = err.message === 'SESSION_NOT_FOUND' ? 'SESSION_NOT_FOUND'
           : err.message === 'SESSION_TERMINATED' ? 'SESSION_TERMINATED'
           : err.message.includes('Maximum sessions') ? 'MAX_SESSIONS'
-          : err.message.includes('workDir') ? 'SPAWN_FAILED'
+          : (err.message.includes('workDir') || err.message.includes('spawn')) ? 'SPAWN_FAILED'
           : 'INVALID_MESSAGE';
+        console.error(`[ws] Error handling "${msg.type}": ${err.message}`);
+        if (code === 'SPAWN_FAILED') {
+          console.error(`[ws] Stack: ${err.stack}`);
+        }
         sendToClient(ws, 'error', { message: err.message, code });
       }
     });
@@ -1083,7 +1155,9 @@ app.get('/health', (_req, res) => res.json({ ok: true }));
 httpServer.listen(CONFIG.port, CONFIG.host, () => {
   console.log(`[Claude Punk] Backend running on http://${CONFIG.host}:${CONFIG.port}`);
   console.log(`[Claude Punk] WebSocket at ws://${CONFIG.host}:${CONFIG.port}/ws`);
-  console.log(`[Claude Punk] Shell: ${CONFIG.shell}`);
+  console.log(`[Claude Punk] Platform: ${process.platform} (${IS_WINDOWS ? 'Windows' : 'Unix'})`);
+  console.log(`[Claude Punk] Shell: ${CONFIG.shell} ${JSON.stringify(CONFIG.shellArgs)}`);
+  console.log(`[Claude Punk] Agent commands: ${JSON.stringify(CONFIG.agentCommands)}`);
   console.log(`[Claude Punk] Auto-run Claude: ${CONFIG.autoRunClaude}`);
   console.log(`[Claude Punk] Max sessions: ${CONFIG.maxSessions}`);
 });
@@ -1111,3 +1185,7 @@ function shutdown(signal) {
 
 process.on('SIGINT', () => shutdown('SIGINT'));
 process.on('SIGTERM', () => shutdown('SIGTERM'));
+// Windows: Ctrl+C fires SIGINT, but closing the terminal fires 'exit' — no SIGTERM support
+if (IS_WINDOWS) {
+  process.on('SIGHUP', () => shutdown('SIGHUP'));
+}
