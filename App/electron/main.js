@@ -28,6 +28,24 @@ let servicesStarted = false;
 log.transports.file.level = 'info';
 log.info('🎮 CLAUDE PUNK starting...');
 
+// ──── Single Instance Lock ──────────────────────────────────────────────────
+
+const gotTheLock = app.requestSingleInstanceLock();
+
+if (!gotTheLock) {
+  log.info('Another instance is already running, focusing existing window...');
+  app.quit();
+} else {
+  app.on('second-instance', (event, commandLine, workingDirectory) => {
+    log.info('Second instance detected, focusing main window');
+    // Someone tried to run a second instance, focus our window instead
+    if (mainWindow) {
+      if (mainWindow.isMinimized()) mainWindow.restore();
+      mainWindow.focus();
+    }
+  });
+}
+
 // ──── Main Window Creation ──────────────────────────────────────────────────
 
 function createWindow() {
