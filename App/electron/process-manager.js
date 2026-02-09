@@ -182,13 +182,13 @@ export async function startFrontend(config) {
   }
 
   const frontendDir = path.join(PROJECT_ROOT, 'frontend');
-  const viteExecutable = path.join(frontendDir, 'node_modules', '.bin', 'vite');
+  const vitePath = path.join(frontendDir, 'node_modules', 'vite', 'bin', 'vite.js');
 
   log.info(`🚀 Starting frontend on port ${config.frontend.port}...`);
-  log.info(`Using vite: ${viteExecutable}`);
+  log.info(`Forking: ${vitePath}`);
 
-  // Use vite directly from node_modules/.bin
-  frontendProcess = spawn(viteExecutable, [], {
+  // Use fork to execute vite with Electron's built-in Node.js
+  frontendProcess = fork(vitePath, [], {
     cwd: frontendDir,
     env: {
       ...process.env,
