@@ -11,9 +11,11 @@ import { app, BrowserWindow, Menu, dialog } from 'electron';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import log from 'electron-log';
-import { loadConfig, saveConfig } from './config-manager.js';
+import { loadConfig, saveConfig, updatePorts, getLastPorts } from './config-manager.js';
 import { createMenu } from './menu.js';
 import { startAll, stopAll, restartAll, getStatus } from './process-manager.js';
+import { ensureAllDependencies } from './dependency-manager.js';
+import { allocatePorts, validatePorts } from './port-manager.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -103,14 +105,110 @@ app.whenReady().then(async () => {
   log.info('Electron app ready');
 
   // Load config
-  const config = loadConfig();
+  let config = loadConfig();
   log.info('Config loaded:', JSON.stringify(config, null, 2));
 
   // Create menu
   const menu = createMenu(handlePreferences, handleRestart, app);
   Menu.setApplicationMenu(menu);
 
-  // Start services automatically
+  // ──── Step 1: Dynamic Port Allocation ────────────────────────────────────
+  log.info('🔌 Allocating ports...');
+
+  try {
+    // Get last allocated ports
+    const lastPorts = getLastPorts();
+
+    // Allocate ports (will try to reuse last ports if available)
+    const allocatedPorts = await allocatePorts(lastPorts);
+
+    if (!allocatedPorts) {
+      log.error('❌ Failed to allocate ports');
+
+      await dialog.showMessageBox({
+        type: 'error',
+        title: 'Port Allocation Failed',
+        message: 'Unable to find available ports',
+        detail: 'All ports in the safe range (13000-13999, 15000-15999) appear to be occupied.\n\n' +
+                'This could be due to:\n' +
+                '- Too many services running on your system\n' +
+                '- Firewall or security software blocking ports\n\n' +
+                'Try closing other applications and restarting.',
+        buttons: ['Quit'],
+      });
+
+      app.quit();
+      return;
+    }
+
+    // Update config with allocated ports
+    updatePorts(allocatedPorts);
+    config = loadConfig(); // Reload config with updated ports
+
+    log.info(`✅ Ports allocated: Backend=${allocatedPorts.backend}, Frontend=${allocatedPorts.frontend}`);
+  } catch (error) {
+    log.error('Error during port allocation:', error);
+
+    await dialog.showErrorBox(
+      'Port Allocation Error',
+      `Failed to allocate ports:\n\n${error.message}\n\nThe app will now quit.`
+    );
+
+    app.quit();
+    return;
+  }
+
+  // ──── Step 2: Ensure Dependencies ────────────────────────────────────────
+  log.info('📦 Checking dependencies...');
+
+  let progressWindow = null;
+
+  // Show progress dialog for dependency installation
+  const showProgress = (message) => {
+    log.info(`[Progress] ${message}`);
+    if (progressWindow) {
+      progressWindow.webContents.send('progress-update', message);
+    }
+  };
+
+  try {
+    const depResult = await ensureAllDependencies(showProgress);
+
+    if (!depResult.backend || !depResult.frontend) {
+      log.error('❌ Failed to ensure dependencies');
+
+      await dialog.showMessageBox({
+        type: 'error',
+        title: 'Dependency Error',
+        message: 'Failed to install required dependencies',
+        detail: `Backend dependencies: ${depResult.backend ? '✅' : '❌'}\n` +
+                `Frontend dependencies: ${depResult.frontend ? '✅' : '❌'}\n\n` +
+                `This may be due to:\n` +
+                `- No internet connection\n` +
+                `- npm not properly installed\n` +
+                `- Insufficient disk space\n\n` +
+                `Check the log file for details.`,
+        buttons: ['Quit', 'Open Log'],
+      });
+
+      app.quit();
+      return;
+    }
+
+    log.info('✅ All dependencies verified');
+  } catch (error) {
+    log.error('Unexpected error checking dependencies:', error);
+
+    await dialog.showErrorBox(
+      'Dependency Check Failed',
+      `Failed to verify dependencies:\n\n${error.message}\n\nCheck the log file for details.`
+    );
+
+    app.quit();
+    return;
+  }
+
+  // ──── Step 3: Start Services ─────────────────────────────────────────────
   log.info('🚀 Starting services...');
 
   try {
@@ -119,6 +217,9 @@ app.whenReady().then(async () => {
     if (result.backend && result.frontend) {
       servicesStarted = true;
       log.info('✅ All services started successfully');
+      log.info(`🌐 Services running on:`);
+      log.info(`   Backend:  http://127.0.0.1:${config.backend.port}`);
+      log.info(`   Frontend: http://127.0.0.1:${config.frontend.port}`);
 
       // Give services a moment to stabilize
       await new Promise(resolve => setTimeout(resolve, 1000));
@@ -219,19 +320,24 @@ async function handlePreferences() {
     message: 'CLAUDE PUNK Settings',
     detail: `Current configuration:
 
-Backend Port: ${config.backend.port}
-Frontend Port: ${config.frontend.port}
+🔌 Dynamic Port Allocation (Auto-assigned):
+Backend Port: ${config.backend.port || 'Not allocated'}
+Frontend Port: ${config.frontend.port || 'Not allocated'}
+Safe Range: Backend (13000-13999), Frontend (15000-15999)
+
+⚙️ Backend Settings:
 Claude CLI Path: ${config.backend.claudePath}
 Auto-run Claude: ${config.backend.autoRunClaude ? 'Yes' : 'No'}
 
-Services Status:
+📊 Services Status:
 Backend: ${status.backend.running ? `✅ Running (PID: ${status.backend.pid})` : '❌ Not running'}
 Frontend: ${status.frontend.running ? `✅ Running (PID: ${status.frontend.pid})` : '❌ Not running'}
 
-Config file location:
+📁 Config file location:
 ${app.getPath('userData')}/config.json
 
-Note: After changing configuration, use "Restart Services" from the menu.`,
+💡 Note: Ports are dynamically allocated on each start to avoid conflicts.
+After changing configuration, use "Restart Services" from the menu.`,
     buttons: ['OK', 'Open Config File', 'Restart Services'],
   });
 

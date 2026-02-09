@@ -15,15 +15,20 @@ import log from 'electron-log';
 
 const DEFAULT_CONFIG = {
   backend: {
-    port: 3000,
+    port: null, // Will be dynamically allocated
     autoRunClaude: true,
     claudePath: detectClaudePath(),
   },
   frontend: {
-    port: 5173,
+    port: null, // Will be dynamically allocated
   },
   app: {
     openBrowserOnStart: false, // Default to false for Electron app
+  },
+  ports: {
+    lastAllocated: null, // Timestamp of last port allocation
+    backend: null, // Last allocated backend port
+    frontend: null, // Last allocated frontend port
   },
 };
 
@@ -56,7 +61,7 @@ const store = new Store({
     backend: {
       type: 'object',
       properties: {
-        port: { type: 'number', minimum: 1024, maximum: 65535, default: 3000 },
+        port: { type: ['number', 'null'], minimum: 1024, maximum: 65535 },
         autoRunClaude: { type: 'boolean', default: true },
         claudePath: { type: 'string' },
       },
@@ -64,13 +69,21 @@ const store = new Store({
     frontend: {
       type: 'object',
       properties: {
-        port: { type: 'number', minimum: 1024, maximum: 65535, default: 5173 },
+        port: { type: ['number', 'null'], minimum: 1024, maximum: 65535 },
       },
     },
     app: {
       type: 'object',
       properties: {
         openBrowserOnStart: { type: 'boolean', default: false },
+      },
+    },
+    ports: {
+      type: 'object',
+      properties: {
+        lastAllocated: { type: ['number', 'null'] },
+        backend: { type: ['number', 'null'] },
+        frontend: { type: ['number', 'null'] },
       },
     },
   },
@@ -97,4 +110,34 @@ export function resetConfig() {
 
 export function getConfigPath() {
   return store.path;
+}
+
+/**
+ * Update allocated ports in config
+ * @param {Object} ports - {backend: number, frontend: number}
+ */
+export function updatePorts(ports) {
+  const config = store.store;
+  config.backend.port = ports.backend;
+  config.frontend.port = ports.frontend;
+  config.ports.backend = ports.backend;
+  config.ports.frontend = ports.frontend;
+  config.ports.lastAllocated = Date.now();
+  store.store = config;
+  log.info(`Ports updated: backend=${ports.backend}, frontend=${ports.frontend}`);
+}
+
+/**
+ * Get last allocated ports
+ * @returns {Object|null} - {backend: number, frontend: number} or null
+ */
+export function getLastPorts() {
+  const config = store.store;
+  if (config.ports?.backend && config.ports?.frontend) {
+    return {
+      backend: config.ports.backend,
+      frontend: config.ports.frontend,
+    };
+  }
+  return null;
 }

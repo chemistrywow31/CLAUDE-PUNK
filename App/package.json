@@ -55,6 +55,11 @@
           "!**/node_modules/*/{test,__tests__,tests,powered-test,example,examples}",
           "!**/node_modules/*.d.ts"
         ]
+      },
+      {
+        "from": "../frontend/public",
+        "to": "frontend/public",
+        "filter": ["**/*"]
       }
     ],
     "mac": {
