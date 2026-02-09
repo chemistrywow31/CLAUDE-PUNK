@@ -38,26 +38,48 @@ function resolveCommand(name) {
 /** Detect the default shell for the current platform. */
 function detectShell() {
   if (IS_WINDOWS) {
-    // Prefer PowerShell if available, fall back to cmd.exe
+    // Allow user override via env var
+    if (process.env.CLAUDE_PUNK_SHELL) return process.env.CLAUDE_PUNK_SHELL;
+
+    // Prefer Git Bash if installed
+    const gitBashPaths = [
+      path.join(process.env.ProgramFiles || 'C:\\Program Files', 'Git', 'bin', 'bash.exe'),
+      path.join(process.env['ProgramFiles(x86)'] || 'C:\\Program Files (x86)', 'Git', 'bin', 'bash.exe'),
+      path.join(process.env.LOCALAPPDATA || '', 'Programs', 'Git', 'bin', 'bash.exe'),
+    ];
+    for (const p of gitBashPaths) {
+      try {
+        fs.accessSync(p, fs.constants.X_OK);
+        console.log(`[config] Found Git Bash at ${p}`);
+        return p;
+      } catch { /* not found, try next */ }
+    }
+
+    // Fallback to cmd.exe
     return process.env.COMSPEC || 'cmd.exe';
   }
   return process.env.SHELL || '/bin/zsh';
 }
 
 /** Get shell arguments for the current platform. */
-function getShellArgs() {
-  if (IS_WINDOWS) return [];          // cmd.exe / powershell don't use -l
+function getShellArgs(shell) {
+  if (IS_WINDOWS) {
+    // Git Bash needs --login for proper PATH setup
+    if (shell && shell.toLowerCase().includes('bash')) return ['--login'];
+    return [];
+  }
   return ['-l'];                       // Unix login shell
 }
 
+const _detectedShell = detectShell();
 const CONFIG = {
   port: parseInt(process.env.PORT || '3000', 10),
   host: '127.0.0.1',
   maxSessions: 16,
   fileCountRatio: 20,
   autoRunClaude: process.env.AUTO_RUN_CLAUDE !== 'false',
-  shell: detectShell(),
-  shellArgs: getShellArgs(),
+  shell: _detectedShell,
+  shellArgs: getShellArgs(_detectedShell),
   lineBufferFlushMs: 100,
   heartbeatIntervalMs: 30_000,
   ringBufferCapacity: 1000,
@@ -415,16 +437,12 @@ class SessionManager extends EventEmitter {
     session.state = 'terminated';
 
     // Graceful kill
+    // NOTE: On Windows, never call session.proc.kill() directly — node-pty's
+    // windowsPtyAgent crashes with "Cannot read properties of undefined (reading
+    // 'forEach')" when the process is already dead. Always use taskkill instead.
     try {
       if (IS_WINDOWS) {
-        // Windows: node-pty kill() doesn't accept signals — use taskkill for
-        // graceful tree kill (kills child processes too)
-        try {
-          execSync(`taskkill /PID ${session.proc.pid} /T`, { timeout: 2000 });
-        } catch {
-          // taskkill may fail if process already exited; fall through to force kill
-          session.proc.kill();
-        }
+        execSync(`taskkill /PID ${session.proc.pid} /T`, { timeout: 2000 });
       } else {
         session.proc.kill('SIGTERM');
       }
@@ -437,7 +455,6 @@ class SessionManager extends EventEmitter {
       session._forceKillTimer = null;
       try {
         if (IS_WINDOWS) {
-          // /F = force, /T = tree (kill child processes)
           execSync(`taskkill /PID ${session.proc.pid} /F /T`, { timeout: 2000 });
         } else {
           session.proc.kill('SIGKILL');
