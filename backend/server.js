@@ -18,6 +18,7 @@ import { EventEmitter } from 'node:events';
 import http from 'node:http';
 import { exec } from 'node:child_process';
 import os from 'node:os';
+import { findAvailablePort, DEFAULT_BACKEND_PORT } from './port-finder.js';
 
 // ─── Section 1: Config ───────────────────────────────────────────────────────
 
@@ -886,13 +887,26 @@ app.use('/api', createRESTRouter(sessionManager, fileWatcher, broadcast));
 // Health check
 app.get('/health', (_req, res) => res.json({ ok: true }));
 
-httpServer.listen(CONFIG.port, CONFIG.host, () => {
-  console.log(`[Claude Punk] Backend running on http://${CONFIG.host}:${CONFIG.port}`);
-  console.log(`[Claude Punk] WebSocket at ws://${CONFIG.host}:${CONFIG.port}/ws`);
-  console.log(`[Claude Punk] Shell: ${CONFIG.shell}`);
-  console.log(`[Claude Punk] Auto-run Claude: ${CONFIG.autoRunClaude}`);
-  console.log(`[Claude Punk] Max sessions: ${CONFIG.maxSessions}`);
-});
+// Start server with dynamic port allocation
+(async () => {
+  try {
+    // Find available port (use DEFAULT_BACKEND_PORT or scan range)
+    const port = await findAvailablePort();
+    CONFIG.port = port;
+
+    httpServer.listen(port, CONFIG.host, () => {
+      console.log(`[Claude Punk] Backend running on http://${CONFIG.host}:${port}`);
+      console.log(`[Claude Punk] WebSocket at ws://${CONFIG.host}:${port}/ws`);
+      console.log(`[Claude Punk] Shell: ${CONFIG.shell}`);
+      console.log(`[Claude Punk] Auto-run Claude: ${CONFIG.autoRunClaude}`);
+      console.log(`[Claude Punk] Max sessions: ${CONFIG.maxSessions}`);
+      console.log(`[Claude Punk] Dynamic port allocated: ${port} (range: 13000-13999)`);
+    });
+  } catch (error) {
+    console.error(`[Claude Punk] Failed to start server: ${error.message}`);
+    process.exit(1);
+  }
+})();
 
 // Graceful shutdown
 function shutdown(signal) {
