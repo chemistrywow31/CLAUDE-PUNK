@@ -8,7 +8,7 @@
  * - Graceful shutdown on app quit
  */
 
-import { spawn } from 'node:child_process';
+import { spawn, fork } from 'node:child_process';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import log from 'electron-log';
@@ -108,14 +108,12 @@ export async function startBackend(config) {
 
   log.info(`🚀 Starting backend on port ${config.backend.port}...`);
 
-  // Use 'node' command directly
-  // Electron bundles Node.js and makes it available via PATH
-  // This works in both development and production
-  const nodePath = 'node';
+  // Use fork to execute server.js with Electron's built-in Node.js
+  // This works in both development and packaged environments
+  const serverPath = path.join(backendDir, 'server.js');
+  log.info(`Forking: ${serverPath}`);
 
-  log.info(`Using Node.js: ${nodePath}`);
-
-  backendProcess = spawn(nodePath, ['server.js'], {
+  backendProcess = fork(serverPath, [], {
     cwd: backendDir,
     env: {
       ...process.env,
