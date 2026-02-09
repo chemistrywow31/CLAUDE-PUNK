@@ -10,14 +10,16 @@ export default defineConfig({
     },
   },
   server: {
-    port: 5173,
+    host: '0.0.0.0', // Listen on all interfaces (IPv4 + IPv6)
+    port: parseInt(process.env.VITE_PORT || '5173', 10),
+    strictPort: true, // Don't try alternative ports if the port is in use
     proxy: {
       '/ws': {
-        target: 'ws://localhost:3000',
+        target: process.env.BACKEND_URL || 'http://localhost:3000',
         ws: true,
       },
       '/api': {
-        target: 'http://localhost:3000',
+        target: process.env.BACKEND_URL || 'http://localhost:3000',
       },
     },
   },

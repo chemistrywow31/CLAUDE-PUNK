@@ -9,3 +9,9 @@ tmp.txt
 tool/
 
 docs
+# Electron build output
+App/out/
+
+# Testing files
+test-electron.sh
+backend/test-pty.js

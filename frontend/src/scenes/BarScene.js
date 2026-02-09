@@ -23,7 +23,6 @@ import Bartender from '../entities/Bartender.js';
 import TerminalTab from '../ui/TerminalTab.js';
 import wsService from '../services/websocket.js';
 import jukeboxAudio from '../services/jukeboxAudio.js';
-import retroTvPlayer from '../services/retroTvPlayer.js';
 import costTracker from '../services/costTracker.js';
 
 export default class BarScene extends Phaser.Scene {
@@ -40,7 +39,6 @@ export default class BarScene extends Phaser.Scene {
     this.folderPicker = null;
     this.dialogBox = null;
     this.jukeboxUI = null;
-    this.retroTvUI = null;
 
     // Session metadata
     this.sessionMeta = new Map();
@@ -56,10 +54,6 @@ export default class BarScene extends Phaser.Scene {
     this.load.atlas('bartender', '/assets/sprites/characters/bartender.png', '/assets/sprites/characters/bartender.json');
     this.load.atlas('drinks', '/assets/sprites/objects/drinks.png', '/assets/sprites/objects/drinks.json');
     this.load.image('neon-sign', '/assets/sprites/ui/neon-sign-main.png');
-    this.load.spritesheet('retro-tv-sheet', '/assets/sprites/objects/retro-tv.png', {
-      frameWidth: 320,
-      frameHeight: 180,
-    });
   }
 
   create() {
@@ -74,7 +68,6 @@ export default class BarScene extends Phaser.Scene {
     this.createCostDashboard();
     this.drawDoor();
     this.drawJukebox();
-    this.drawRetroTV();
     this.drawNeonSigns();
     this.setupWebSocketListeners();
     this.setupDemoMode();
@@ -118,21 +111,6 @@ export default class BarScene extends Phaser.Scene {
     if (!jbTex || jbTex.frameTotal <= 2) {
       if (jbTex) this.textures.remove('jukebox');
       this.generateJukeboxTexture();
-    }
-
-    // Retro TV texture — prefer loaded sprite sheet, fallback to generated
-    const tvSheet = this.textures.exists('retro-tv-sheet') ? this.textures.get('retro-tv-sheet') : null;
-    if (tvSheet && tvSheet.frameTotal > 1) {
-      // Use loaded sprite sheet
-      this._retroTvKey = 'retro-tv-sheet';
-    } else {
-      // Fallback to procedural
-      const tvTex = this.textures.exists('retro-tv') ? this.textures.get('retro-tv') : null;
-      if (!tvTex || tvTex.frameTotal <= 1) {
-        if (tvTex) this.textures.remove('retro-tv');
-        this.generateRetroTVTexture();
-      }
-      this._retroTvKey = 'retro-tv';
     }
   }
 
@@ -323,71 +301,6 @@ export default class BarScene extends Phaser.Scene {
 
     const source = this.textures.get(tmpKey).getSourceImage();
     this.textures.addSpriteSheet('jukebox', source, {
-      frameWidth: fw,
-      frameHeight: fh,
-    });
-    this.textures.remove(tmpKey);
-  }
-
-  generateRetroTVTexture() {
-    const g = this.make.graphics({ x: 0, y: 0, add: false });
-    const fw = 72;
-    const fh = 52;
-
-    const screenColors = [0x0b1a24, 0x103048, 0x0f2a3a];
-    const glowAlpha = [0.25, 0.5, 0.4];
-
-    for (let frame = 0; frame < 3; frame++) {
-      const ox = frame * fw;
-
-      // Body
-      g.fillStyle(0x2a2a3a);
-      g.fillRoundedRect(ox + 2, 4, 68, 44, 6);
-
-      // Bezel
-      g.fillStyle(0x3a3a4e);
-      g.fillRoundedRect(ox + 6, 8, 60, 30, 4);
-
-      // Screen glow
-      g.fillStyle(screenColors[frame], glowAlpha[frame]);
-      g.fillRect(ox + 10, 12, 52, 22);
-
-      // Screen dark layer
-      g.fillStyle(0x06070d, 0.9);
-      g.fillRect(ox + 12, 14, 48, 18);
-
-      // Scanline hints
-      g.fillStyle(0x00f0ff, 0.12 + frame * 0.05);
-      for (let i = 0; i < 4; i++) {
-        g.fillRect(ox + 14, 16 + i * 4, 44, 1);
-      }
-
-      // Control panel
-      g.fillStyle(0x1a1a2e);
-      g.fillRect(ox + 8, 40, 56, 6);
-
-      // Knobs
-      g.fillStyle(0xffaa00, 0.7);
-      g.fillCircle(ox + 18, 43, 2);
-      g.fillStyle(0x00f0ff, 0.7);
-      g.fillCircle(ox + 28, 43, 2);
-
-      // Feet
-      g.fillStyle(0x4a4a5e);
-      g.fillRect(ox + 10, 48, 12, 4);
-      g.fillRect(ox + 50, 48, 12, 4);
-
-      // Border
-      g.lineStyle(1, 0xff0080, frame === 0 ? 0.4 : 0.7);
-      g.strokeRoundedRect(ox + 2, 4, 68, 44, 6);
-    }
-
-    const tmpKey = '__retro_tv_tmp';
-    g.generateTexture(tmpKey, fw * 3, fh);
-    g.destroy();
-
-    const source = this.textures.get(tmpKey).getSourceImage();
-    this.textures.addSpriteSheet('retro-tv', source, {
       frameWidth: fw,
       frameHeight: fh,
     });
@@ -903,63 +816,57 @@ export default class BarScene extends Phaser.Scene {
     });
     label.setOrigin(0.5, 0);
     label.setDepth(15);
-  }
 
-  drawRetroTV() {
-    const tvX = 1385;
-    const tvY = 245;
-    const useSheet = this._retroTvKey === 'retro-tv-sheet';
-    const tvScale = useSheet ? 1.45 : 3;
+    // Settings gear button (open log file)
+    const gearX = jbX + 120;
+    const gearY = jbY - 80;
 
-    const tv = this.add.sprite(tvX, tvY, this._retroTvKey, 0);
-    tv.setOrigin(0.5, 1);
-    tv.setScale(tvScale);
-    tv.setDepth(6);
-    tv.setInteractive({ useHandCursor: true });
+    // Gear icon background circle
+    const gearBg = this.add.circle(gearX, gearY, 28, 0x1a1a2e, 1);
+    gearBg.setDepth(10);
+    gearBg.setInteractive({ useHandCursor: true });
 
-    const glow = this.add.graphics();
-    glow.setDepth(5);
-    glow.fillStyle(0x00f0ff, 0.06);
-    glow.fillCircle(tvX, tvY - 144, 260);
-    glow.fillStyle(0xff0080, 0.04);
-    glow.fillCircle(tvX, tvY - 144, 180);
-
-    let frame = 1;
-    this.time.addEvent({
-      delay: 320,
-      loop: true,
-      callback: () => {
-        if (tv.active === false) return;
-        if (retroTvPlayer.playing) {
-          tv.setFrame(frame);
-          frame = frame >= 2 ? 1 : frame + 1;
-        } else {
-          tv.setFrame(0);
-          frame = 1;
-        }
-      },
-    });
-
-    tv.on('pointerover', () => tv.setTint(0x44ffff));
-    tv.on('pointerout', () => tv.clearTint());
-
-    tv.on('pointerdown', () => {
-      if (this.retroTvUI) this.retroTvUI.toggle();
-    });
-
-    const label = this.add.text(tvX, tvY + 10, 'RETRO TV', {
-      fontSize: '15px',
-      fontFamily: 'Rajdhani, sans-serif',
-      fontStyle: 'bold',
+    // Gear icon text
+    const gearIcon = this.add.text(gearX, gearY, '⚙', {
+      fontSize: '42px',
+      fontFamily: 'Arial, sans-serif',
       color: '#00f0ff',
-      stroke: '#0a0a14',
-      strokeThickness: 4,
     });
-    label.setOrigin(0.5, 0);
-    label.setDepth(15);
+    gearIcon.setOrigin(0.5, 0.5);
+    gearIcon.setDepth(11);
 
+    // Hover effects
+    gearBg.on('pointerover', () => {
+      gearBg.setFillStyle(0x2a2a3e, 1);
+      gearIcon.setColor('#ff0080');
+    });
+    gearBg.on('pointerout', () => {
+      gearBg.setFillStyle(0x1a1a2e, 1);
+      gearIcon.setColor('#00f0ff');
+    });
+
+    // Click to show log file content
+    gearBg.on('pointerdown', async () => {
+      try {
+        const backendUrl = window.location.hostname === 'localhost'
+          ? 'http://127.0.0.1:3000'
+          : `http://127.0.0.1:${window.location.port || 3000}`;
+
+        const response = await fetch(`${backendUrl}/api/open-log`, {
+          method: 'GET',
+        });
+        const data = await response.json();
+
+        if (data.success) {
+          this.showLogModal(data.content);
+        } else {
+          console.error('Failed to read log:', data.message);
+        }
+      } catch (error) {
+        console.error('Failed to fetch log file:', error);
+      }
+    });
   }
-
 
   drawNeonSigns() {
     // -- "CLAUDE PUNK" neon sign -- isometric tilt matching 2.5D perspective --
@@ -1562,6 +1469,146 @@ export default class BarScene extends Phaser.Scene {
       this.seatCountText.setText(`${available} seats open`);
     }
     this.events.emit('seat-available', { count: available });
+  }
+
+  showLogModal(logContent) {
+    // Get canvas actual size and position
+    const canvas = this.sys.game.canvas;
+    const canvasRect = canvas.getBoundingClientRect();
+    const scaleX = canvasRect.width / this.sys.game.config.width;
+    const scaleY = canvasRect.height / this.sys.game.config.height;
+
+    // Create semi-transparent overlay
+    const overlay = this.add.rectangle(0, 0, 1920, 1080, 0x000000, 0.85);
+    overlay.setOrigin(0, 0);
+    overlay.setDepth(1000);
+    overlay.setInteractive();
+
+    // Modal container (game coordinates)
+    const modalWidth = 1600;
+    const modalHeight = 900;
+    const modalX = 960;
+    const modalY = 540;
+
+    // Modal background
+    const modalBg = this.add.rectangle(modalX, modalY, modalWidth, modalHeight, 0x1a1a2e, 1);
+    modalBg.setDepth(1001);
+
+    // Modal border (neon cyan)
+    const border = this.add.graphics();
+    border.lineStyle(2, 0x00f0ff, 1);
+    border.strokeRect(modalX - modalWidth / 2, modalY - modalHeight / 2, modalWidth, modalHeight);
+    border.setDepth(1002);
+
+    // Title
+    const title = this.add.text(modalX, modalY - modalHeight / 2 + 40, 'ELECTRON MAIN.LOG', {
+      fontSize: '32px',
+      fontFamily: 'JetBrains Mono, monospace',
+      color: '#00f0ff',
+      fontStyle: 'bold',
+    });
+    title.setOrigin(0.5, 0.5);
+    title.setDepth(1003);
+
+    // Calculate DOM position and size based on canvas scale
+    const contentGameX = modalX - modalWidth / 2 + 40;
+    const contentGameY = modalY - modalHeight / 2 + 100;
+    const contentGameWidth = modalWidth - 80;
+    const contentGameHeight = modalHeight - 180;
+
+    // Log content area (using HTML DOM for scrolling)
+    const contentDiv = document.createElement('div');
+    contentDiv.style.position = 'absolute';
+    contentDiv.style.left = `${canvasRect.left + contentGameX * scaleX}px`;
+    contentDiv.style.top = `${canvasRect.top + contentGameY * scaleY}px`;
+    contentDiv.style.width = `${contentGameWidth * scaleX}px`;
+    contentDiv.style.height = `${contentGameHeight * scaleY}px`;
+    contentDiv.style.backgroundColor = '#0a0a14';
+    contentDiv.style.color = '#e0e0e0';
+    contentDiv.style.fontFamily = 'JetBrains Mono, Courier New, monospace';
+    contentDiv.style.fontSize = '13px';
+    contentDiv.style.lineHeight = '1.6';
+    contentDiv.style.letterSpacing = '0.02em';
+    contentDiv.style.padding = '24px';
+    contentDiv.style.overflow = 'auto';
+    contentDiv.style.whiteSpace = 'pre-wrap';
+    contentDiv.style.wordBreak = 'break-all';
+    contentDiv.style.overflowWrap = 'break-word';
+    contentDiv.style.border = '1px solid #4a4a5e';
+    contentDiv.style.borderRadius = '4px';
+    contentDiv.style.zIndex = '1003';
+    contentDiv.style.boxSizing = 'border-box';
+    contentDiv.style.maxWidth = '100%';
+    contentDiv.style.maxHeight = '100%';
+
+    // Custom scrollbar styling
+    contentDiv.style.scrollbarWidth = 'thin';
+    contentDiv.style.scrollbarColor = '#00f0ff #1a1a2e';
+
+    // Set content directly (no pre element)
+    contentDiv.textContent = logContent || 'No log content available.';
+    document.body.appendChild(contentDiv);
+
+    // Add custom scrollbar styles for webkit browsers
+    const style = document.createElement('style');
+    style.textContent = `
+      div[style*="position: absolute"] {
+        scrollbar-width: thin;
+        scrollbar-color: #00f0ff #1a1a2e;
+      }
+      div[style*="position: absolute"]::-webkit-scrollbar {
+        width: 12px;
+        height: 12px;
+      }
+      div[style*="position: absolute"]::-webkit-scrollbar-track {
+        background: #1a1a2e;
+        border-radius: 4px;
+      }
+      div[style*="position: absolute"]::-webkit-scrollbar-thumb {
+        background: #00f0ff;
+        border-radius: 4px;
+        border: 2px solid #1a1a2e;
+      }
+      div[style*="position: absolute"]::-webkit-scrollbar-thumb:hover {
+        background: #ff0080;
+      }
+    `;
+    document.head.appendChild(style);
+
+    // Close button
+    const closeBtn = this.add.text(modalX, modalY + modalHeight / 2 - 40, '[ CLOSE ]', {
+      fontSize: '24px',
+      fontFamily: 'JetBrains Mono, monospace',
+      color: '#00f0ff',
+      fontStyle: 'bold',
+    });
+    closeBtn.setOrigin(0.5, 0.5);
+    closeBtn.setDepth(1003);
+    closeBtn.setInteractive({ useHandCursor: true });
+
+    // Close button hover
+    closeBtn.on('pointerover', () => {
+      closeBtn.setColor('#ff0080');
+    });
+    closeBtn.on('pointerout', () => {
+      closeBtn.setColor('#00f0ff');
+    });
+
+    // Close modal
+    const closeModal = () => {
+      overlay.destroy();
+      modalBg.destroy();
+      border.destroy();
+      title.destroy();
+      closeBtn.destroy();
+      document.body.removeChild(contentDiv);
+      if (style && style.parentNode) {
+        document.head.removeChild(style);
+      }
+    };
+
+    closeBtn.on('pointerdown', closeModal);
+    overlay.on('pointerdown', closeModal);
   }
 
 }

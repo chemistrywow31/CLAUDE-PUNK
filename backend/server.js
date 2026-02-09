@@ -15,19 +15,12 @@ import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 import { EventEmitter } from 'node:events';
-import { execSync } from 'node:child_process';
 import http from 'node:http';
+import { exec } from 'node:child_process';
+import os from 'node:os';
+import { findAvailablePort, DEFAULT_BACKEND_PORT } from './port-finder.js';
 
 // ─── Section 1: Config ───────────────────────────────────────────────────────
-
-/** Resolve a CLI command to its absolute path via `which`, falling back to the bare name. */
-function resolveCommand(name) {
-  try {
-    return execSync(`which ${name}`, { encoding: 'utf8' }).trim();
-  } catch {
-    return name;
-  }
-}
 
 const CONFIG = {
   port: parseInt(process.env.PORT || '3000', 10),
@@ -43,13 +36,12 @@ const CONFIG = {
   ptyDefaultRows: 40,
   autoRunDelayMs: 300,
   agentCommands: {
-    claude: `${resolveCommand('claude')} --dangerously-skip-permissions`,
-    codex: `${resolveCommand('codex')} --full-auto`,
+    claude: (process.env.CLAUDE_PATH || '/Users/paul_huang/.local/bin/claude') + ' --dangerously-skip-permissions',
+    codex: 'codex --full-auto',
   },
   fileWatchDebounceMs: 500,
-  fileTreeMaxDepth: 10,
+  fileTreeMaxDepth: 3,
   shutdownTimeoutMs: 5000,
-  rawBufferMaxBytes: 100_000, // 100KB cap for raw terminal replay buffer
 };
 
 // Directories/files to exclude from file watching and tree building
@@ -93,32 +85,32 @@ class RingBuffer {
   }
 }
 
-// ─── Section 2b: RawReplayBuffer ─────────────────────────────────────────────
+// ─── Log Buffer ──────────────────────────────────────────────────────────────
 
-/** Capped string buffer that keeps the most recent N bytes of raw PTY output. */
-class RawReplayBuffer {
-  constructor(maxBytes = CONFIG.rawBufferMaxBytes) {
-    this.maxBytes = maxBytes;
-    this.chunks = [];
-    this.totalBytes = 0;
-  }
+const logBuffer = new RingBuffer(1000); // Store last 1000 log entries
 
-  write(data) {
-    const len = Buffer.byteLength(data, 'utf8');
-    this.chunks.push(data);
-    this.totalBytes += len;
-    // Evict oldest chunks until under cap
-    while (this.totalBytes > this.maxBytes && this.chunks.length > 1) {
-      const removed = this.chunks.shift();
-      this.totalBytes -= Buffer.byteLength(removed, 'utf8');
-    }
-  }
+// Override console methods to capture logs
+const originalLog = console.log.bind(console);
+const originalWarn = console.warn.bind(console);
+const originalError = console.error.bind(console);
 
-  /** Return all stored output as a single string. */
-  read() {
-    return this.chunks.join('');
-  }
-}
+console.log = (...args) => {
+  const message = args.map(arg => typeof arg === 'object' ? JSON.stringify(arg) : String(arg)).join(' ');
+  logBuffer.write({ timestamp: new Date().toISOString(), level: 'info', message });
+  originalLog(...args);
+};
+
+console.warn = (...args) => {
+  const message = args.map(arg => typeof arg === 'object' ? JSON.stringify(arg) : String(arg)).join(' ');
+  logBuffer.write({ timestamp: new Date().toISOString(), level: 'warn', message });
+  originalWarn(...args);
+};
+
+console.error = (...args) => {
+  const message = args.map(arg => typeof arg === 'object' ? JSON.stringify(arg) : String(arg)).join(' ');
+  logBuffer.write({ timestamp: new Date().toISOString(), level: 'error', message });
+  originalError(...args);
+};
 
 // ─── Section 3: LineBuffer ───────────────────────────────────────────────────
 
@@ -272,7 +264,6 @@ class SessionManager extends EventEmitter {
     });
 
     const ringBuffer = new RingBuffer();
-    const rawReplayBuffer = new RawReplayBuffer();
 
     const lineBuffer = new LineBuffer((stream, line) => {
       const outputMsg = { sessionId: id, stream, data: line, timestamp: new Date().toISOString() };
@@ -283,7 +274,6 @@ class SessionManager extends EventEmitter {
     // node-pty merges stdout+stderr into single stream
     proc.onData((data) => {
       lineBuffer.feed('stdout', data);
-      rawReplayBuffer.write(data);
       // Also emit raw data for xterm.js rendering
       this.emit('terminal-output', { sessionId: id, data });
     });
@@ -303,12 +293,6 @@ class SessionManager extends EventEmitter {
       }
 
       this.emit('session-exit', { sessionId: id, exitCode });
-
-      // Clean up terminated session from memory after a short delay
-      // (allows the exit event to propagate to WS clients first)
-      setTimeout(() => {
-        this.sessions.delete(id);
-      }, 5000);
     });
 
     const session = {
@@ -320,11 +304,8 @@ class SessionManager extends EventEmitter {
       createdAt,
       proc,
       ringBuffer,
-      rawReplayBuffer,
       lineBuffer,
       exitCode: null,
-      cols: CONFIG.ptyDefaultCols,
-      rows: CONFIG.ptyDefaultRows,
     };
 
     this.sessions.set(id, session);
@@ -355,8 +336,6 @@ class SessionManager extends EventEmitter {
   resize(id, cols, rows) {
     const session = this.getSession(id);
     session.proc.resize(cols, rows);
-    session.cols = cols;
-    session.rows = rows;
   }
 
   kill(id) {
@@ -396,30 +375,8 @@ class SessionManager extends EventEmitter {
     return session.ringBuffer.readAll();
   }
 
-  getRawReplay(id) {
-    const session = this.sessions.get(id);
-    if (!session) return '';
-    return session.rawReplayBuffer.read();
-  }
-
   list() {
-    return Array.from(this.sessions.values())
-      .filter((s) => s.state !== 'terminated')
-      .map((s) => this.toPublic(s));
-  }
-
-  /** Return all sessions including terminated ones (for debugging). */
-  listAll() {
     return Array.from(this.sessions.values()).map((s) => this.toPublic(s));
-  }
-
-  /** Remove terminated sessions from memory. */
-  pruneTerminated() {
-    for (const [id, session] of this.sessions) {
-      if (session.state === 'terminated') {
-        this.sessions.delete(id);
-      }
-    }
   }
 
   get(id) {
@@ -454,7 +411,6 @@ class FileWatcher extends EventEmitter {
   constructor() {
     super();
     this.watchers = new Map(); // sessionId -> { watcher, workDir, debounceTimer }
-    this.latestCounts = new Map(); // sessionId -> { fileCount, drinkCount }
   }
 
   watch(sessionId, workDir) {
@@ -479,7 +435,6 @@ class FileWatcher extends EventEmitter {
         try {
           const fileCount = await this.countFiles(workDir);
           const drinkCount = Math.floor(fileCount / CONFIG.fileCountRatio);
-          this.latestCounts.set(sessionId, { fileCount, drinkCount });
           this.emit('files-update', { sessionId, fileCount, drinkCount });
         } catch (err) {
           console.error(`[FileWatcher] Error counting files for ${sessionId}:`, err.message);
@@ -523,7 +478,6 @@ class FileWatcher extends EventEmitter {
     if (entry.debounceTimer) clearTimeout(entry.debounceTimer);
     entry.watcher.close();
     this.watchers.delete(sessionId);
-    this.latestCounts.delete(sessionId);
   }
 
   unwatchAll() {
@@ -561,15 +515,7 @@ async function buildFileTree(dir, currentDepth = 0, baseDir = null) {
     const fullPath = path.join(dir, entry.name);
     const relPath = path.relative(baseDir, fullPath);
 
-    // Resolve symlinks via stat (follows links) to get real type
-    let realStat;
-    try {
-      realStat = await fs.promises.stat(fullPath);
-    } catch {
-      continue; // skip broken symlinks or inaccessible entries
-    }
-
-    if (realStat.isDirectory()) {
+    if (entry.isDirectory()) {
       const children = await buildFileTree(fullPath, currentDepth + 1, baseDir);
       nodes.push({
         name: entry.name,
@@ -577,12 +523,19 @@ async function buildFileTree(dir, currentDepth = 0, baseDir = null) {
         isDir: true,
         children,
       });
-    } else if (realStat.isFile()) {
+    } else if (entry.isFile()) {
+      let size = 0;
+      try {
+        const stat = await fs.promises.stat(fullPath);
+        size = stat.size;
+      } catch {
+        // ignore
+      }
       nodes.push({
         name: entry.name,
         path: relPath,
         isDir: false,
-        size: realStat.size,
+        size,
       });
     }
   }
@@ -683,38 +636,16 @@ function createWSS(server, sessionManager, fileWatcher) {
     ws._alive = true;
     ws.on('pong', () => { ws._alive = true; });
 
-    // Replay: send all active session states (resume support)
-    const activeSessions = sessionManager.list();
-    for (const session of activeSessions) {
+    // Replay: send all current session states
+    for (const session of sessionManager.list()) {
       sendToClient(ws, 'session.update', session);
     }
 
-    // Replay: send raw terminal output for xterm.js rendering.
-    // Uses a dedicated 'terminal.replay' event so the frontend can defer
-    // writing until the xterm is attached to the DOM and properly sized,
-    // preventing layout corruption from size mismatches.
-    for (const session of activeSessions) {
-      const rawData = sessionManager.getRawReplay(session.id);
-      if (rawData) {
-        const s = sessionManager.sessions.get(session.id);
-        sendToClient(ws, 'terminal.replay', {
-          sessionId: session.id,
-          data: rawData,
-          cols: s?.cols || CONFIG.ptyDefaultCols,
-          rows: s?.rows || CONFIG.ptyDefaultRows,
-        });
-      }
-    }
-
-    // Replay: send current file counts (drinks)
-    for (const session of activeSessions) {
-      const counts = fileWatcher.latestCounts.get(session.id);
-      if (counts) {
-        sendToClient(ws, 'files.update', {
-          sessionId: session.id,
-          fileCount: counts.fileCount,
-          drinkCount: counts.drinkCount,
-        });
+    // Replay: send output history for each active session
+    for (const session of sessionManager.list()) {
+      const history = sessionManager.getHistory(session.id);
+      for (const msg of history) {
+        sendToClient(ws, 'session.output', msg);
       }
     }
 
@@ -831,154 +762,6 @@ function createWSS(server, sessionManager, fileWatcher) {
             break;
           }
 
-          case 'file.read': {
-            const { sessionId, filePath } = msg.payload;
-            if (!sessionId || !filePath) {
-              sendToClient(ws, 'error', { message: 'sessionId and filePath are required', code: 'INVALID_MESSAGE' });
-              return;
-            }
-            const readSession = sessionManager.get(sessionId);
-            if (!readSession) {
-              sendToClient(ws, 'error', { message: 'Session not found', code: 'SESSION_NOT_FOUND' });
-              return;
-            }
-            const absPath = path.resolve(readSession.workDir, filePath);
-            if (!absPath.startsWith(readSession.workDir)) {
-              sendToClient(ws, 'error', { message: 'Path traversal not allowed', code: 'INVALID_MESSAGE' });
-              return;
-            }
-            try {
-              const stat = await fs.promises.stat(absPath);
-              if (stat.size > 5 * 1024 * 1024) {
-                sendToClient(ws, 'error', { message: 'File too large (max 5MB)', code: 'INVALID_MESSAGE' });
-                return;
-              }
-              const ext = path.extname(absPath).toLowerCase();
-              const imageExts = new Set(['.png', '.jpg', '.jpeg', '.gif', '.webp', '.svg', '.ico', '.bmp']);
-              const isImage = imageExts.has(ext);
-              if (isImage) {
-                const buf = await fs.promises.readFile(absPath);
-                sendToClient(ws, 'file.content', {
-                  sessionId,
-                  filePath,
-                  content: buf.toString('base64'),
-                  encoding: 'base64',
-                  fileType: 'image',
-                  size: stat.size,
-                });
-              } else {
-                const content = await fs.promises.readFile(absPath, 'utf-8');
-                sendToClient(ws, 'file.content', {
-                  sessionId,
-                  filePath,
-                  content,
-                  encoding: 'utf-8',
-                  fileType: 'text',
-                  size: stat.size,
-                });
-              }
-            } catch (err) {
-              sendToClient(ws, 'error', { message: `Cannot read file: ${err.message}`, code: 'INVALID_MESSAGE' });
-            }
-            break;
-          }
-
-          case 'file.write': {
-            const { sessionId, filePath, content } = msg.payload;
-            if (!sessionId || !filePath || content === undefined) {
-              sendToClient(ws, 'error', { message: 'sessionId, filePath, and content are required', code: 'INVALID_MESSAGE' });
-              return;
-            }
-            const writeSession = sessionManager.get(sessionId);
-            if (!writeSession) {
-              sendToClient(ws, 'error', { message: 'Session not found', code: 'SESSION_NOT_FOUND' });
-              return;
-            }
-            const writeAbsPath = path.resolve(writeSession.workDir, filePath);
-            if (!writeAbsPath.startsWith(writeSession.workDir)) {
-              sendToClient(ws, 'error', { message: 'Path traversal not allowed', code: 'INVALID_MESSAGE' });
-              return;
-            }
-            try {
-              await fs.promises.writeFile(writeAbsPath, content, 'utf-8');
-              sendToClient(ws, 'file.saved', { sessionId, filePath });
-            } catch (err) {
-              sendToClient(ws, 'error', { message: `Cannot write file: ${err.message}`, code: 'INVALID_MESSAGE' });
-            }
-            break;
-          }
-
-          case 'file.create': {
-            const { sessionId, filePath, isDir } = msg.payload;
-            if (!sessionId || !filePath) {
-              sendToClient(ws, 'error', { message: 'sessionId and filePath are required', code: 'INVALID_MESSAGE' });
-              return;
-            }
-            const createSession = sessionManager.get(sessionId);
-            if (!createSession) {
-              sendToClient(ws, 'error', { message: 'Session not found', code: 'SESSION_NOT_FOUND' });
-              return;
-            }
-            const createAbsPath = path.resolve(createSession.workDir, filePath);
-            if (!createAbsPath.startsWith(createSession.workDir)) {
-              sendToClient(ws, 'error', { message: 'Path traversal not allowed', code: 'INVALID_MESSAGE' });
-              return;
-            }
-            try {
-              if (isDir) {
-                await fs.promises.mkdir(createAbsPath, { recursive: true });
-              } else {
-                // Ensure parent directory exists
-                await fs.promises.mkdir(path.dirname(createAbsPath), { recursive: true });
-                // Create empty file (fail if already exists)
-                await fs.promises.writeFile(createAbsPath, '', { flag: 'wx' });
-              }
-              sendToClient(ws, 'file.created', { sessionId, filePath, isDir: !!isDir });
-            } catch (err) {
-              if (err.code === 'EEXIST') {
-                sendToClient(ws, 'error', { message: 'File already exists', code: 'INVALID_MESSAGE' });
-              } else {
-                sendToClient(ws, 'error', { message: `Cannot create: ${err.message}`, code: 'INVALID_MESSAGE' });
-              }
-            }
-            break;
-          }
-
-          case 'file.delete': {
-            const { sessionId, filePath } = msg.payload;
-            if (!sessionId || !filePath) {
-              sendToClient(ws, 'error', { message: 'sessionId and filePath are required', code: 'INVALID_MESSAGE' });
-              return;
-            }
-            const delSession = sessionManager.get(sessionId);
-            if (!delSession) {
-              sendToClient(ws, 'error', { message: 'Session not found', code: 'SESSION_NOT_FOUND' });
-              return;
-            }
-            const delAbsPath = path.resolve(delSession.workDir, filePath);
-            if (!delAbsPath.startsWith(delSession.workDir)) {
-              sendToClient(ws, 'error', { message: 'Path traversal not allowed', code: 'INVALID_MESSAGE' });
-              return;
-            }
-            // Prevent deleting the workDir itself
-            if (delAbsPath === delSession.workDir) {
-              sendToClient(ws, 'error', { message: 'Cannot delete root directory', code: 'INVALID_MESSAGE' });
-              return;
-            }
-            try {
-              const stat = await fs.promises.stat(delAbsPath);
-              if (stat.isDirectory()) {
-                await fs.promises.rm(delAbsPath, { recursive: true });
-              } else {
-                await fs.promises.unlink(delAbsPath);
-              }
-              sendToClient(ws, 'file.deleted', { sessionId, filePath });
-            } catch (err) {
-              sendToClient(ws, 'error', { message: `Cannot delete: ${err.message}`, code: 'INVALID_MESSAGE' });
-            }
-            break;
-          }
-
           case 'claude.requestConfig': {
             const { sessionId } = msg.payload;
             if (!sessionId) {
@@ -1040,9 +823,8 @@ function createRESTRouter(sessionManager, fileWatcher, broadcastFn) {
     }
   });
 
-  router.get('/sessions', (req, res) => {
-    const all = req.query.all === 'true';
-    res.json(all ? sessionManager.listAll() : sessionManager.list());
+  router.get('/sessions', (_req, res) => {
+    res.json(sessionManager.list());
   });
 
   router.get('/sessions/:id', (req, res) => {
@@ -1057,6 +839,31 @@ function createRESTRouter(sessionManager, fileWatcher, broadcastFn) {
     sessionManager.kill(req.params.id);
     fileWatcher.unwatch(req.params.id);
     res.json({ ok: true });
+  });
+
+  // Get server logs
+  router.get('/logs', (_req, res) => {
+    const logs = logBuffer.readAll();
+    res.json({ logs });
+  });
+
+  // Read Electron main.log file content
+  router.get('/open-log', (_req, res) => {
+    // Electron log path: ~/Library/Logs/CLAUDE PUNK/main.log
+    const logPath = path.join(os.homedir(), 'Library', 'Logs', 'CLAUDE PUNK', 'main.log');
+
+    // Read log file content
+    fs.readFile(logPath, 'utf8', (error, data) => {
+      if (error) {
+        console.error('Failed to read log file:', error);
+        return res.status(500).json({
+          success: false,
+          error: 'Failed to read log file',
+          message: error.message
+        });
+      }
+      res.json({ success: true, content: data });
+    });
   });
 
   return router;
@@ -1080,13 +887,35 @@ app.use('/api', createRESTRouter(sessionManager, fileWatcher, broadcast));
 // Health check
 app.get('/health', (_req, res) => res.json({ ok: true }));
 
-httpServer.listen(CONFIG.port, CONFIG.host, () => {
-  console.log(`[Claude Punk] Backend running on http://${CONFIG.host}:${CONFIG.port}`);
-  console.log(`[Claude Punk] WebSocket at ws://${CONFIG.host}:${CONFIG.port}/ws`);
-  console.log(`[Claude Punk] Shell: ${CONFIG.shell}`);
-  console.log(`[Claude Punk] Auto-run Claude: ${CONFIG.autoRunClaude}`);
-  console.log(`[Claude Punk] Max sessions: ${CONFIG.maxSessions}`);
-});
+// Start server with port allocation
+(async () => {
+  try {
+    let port;
+
+    // Check if PORT is set by Electron or environment
+    if (process.env.PORT) {
+      port = parseInt(process.env.PORT, 10);
+      console.log(`[Claude Punk] Using port from environment: ${port}`);
+    } else {
+      // Development mode: find available port dynamically
+      port = await findAvailablePort();
+      console.log(`[Claude Punk] Dynamic port allocated: ${port} (range: 13000-13999)`);
+    }
+
+    CONFIG.port = port;
+
+    httpServer.listen(port, CONFIG.host, () => {
+      console.log(`[Claude Punk] Backend running on http://${CONFIG.host}:${port}`);
+      console.log(`[Claude Punk] WebSocket at ws://${CONFIG.host}:${port}/ws`);
+      console.log(`[Claude Punk] Shell: ${CONFIG.shell}`);
+      console.log(`[Claude Punk] Auto-run Claude: ${CONFIG.autoRunClaude}`);
+      console.log(`[Claude Punk] Max sessions: ${CONFIG.maxSessions}`);
+    });
+  } catch (error) {
+    console.error(`[Claude Punk] Failed to start server: ${error.message}`);
+    process.exit(1);
+  }
+})();
 
 // Graceful shutdown
 function shutdown(signal) {
