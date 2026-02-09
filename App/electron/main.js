@@ -61,10 +61,18 @@ function createWindow() {
     );
   });
 
-  // Open DevTools in development
-  if (process.env.NODE_ENV === 'development') {
+  // Open DevTools automatically (unless app is packaged)
+  if (!app.isPackaged) {
     mainWindow.webContents.openDevTools();
+    log.info('🔧 DevTools opened (press F12 or Cmd+Alt+I to toggle)');
   }
+
+  // Log frontend console messages to electron log
+  mainWindow.webContents.on('console-message', (event, level, message, line, sourceId) => {
+    const levelMap = ['[Frontend]', '[Frontend Warning]', '[Frontend Error]'];
+    const logLevel = levelMap[level] || '[Frontend]';
+    log.info(`${logLevel} ${message}`);
+  });
 
   mainWindow.on('closed', () => {
     mainWindow = null;

@@ -69,8 +69,14 @@ export function createMenu(onPreferences, onRestart, app) {
         { label: 'Reload', accelerator: 'CmdOrCtrl+R', role: 'reload' },
         {
           label: 'Toggle Developer Tools',
+          accelerator: 'F12',
+          role: 'toggleDevTools',
+        },
+        {
+          label: 'Toggle Developer Tools (Alt)',
           accelerator: 'Alt+CmdOrCtrl+I',
           role: 'toggleDevTools',
+          visible: false,  // Hidden menu item for alternative shortcut
         },
         { type: 'separator' },
         { label: 'Actual Size', accelerator: 'CmdOrCtrl+0', role: 'resetZoom' },
