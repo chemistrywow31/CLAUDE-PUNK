@@ -13,7 +13,7 @@ export default defineConfig({
     port: 5173,
     proxy: {
       '/ws': {
-        target: 'ws://localhost:3000',
+        target: 'http://localhost:3000',
         ws: true,
       },
       '/api': {
