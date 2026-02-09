@@ -5,7 +5,7 @@
  * Currently minimal, can be extended for future features.
  */
 
-import { contextBridge, ipcRenderer } from 'electron';
+const { contextBridge, ipcRenderer } = require('electron');
 
 // Future: expose config APIs, etc.
 // For now, we don't need to expose anything since the frontend
