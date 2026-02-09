@@ -108,7 +108,12 @@ export async function startBackend(config) {
 
   log.info(`🚀 Starting backend on port ${config.backend.port}...`);
 
-  backendProcess = spawn('node', ['server.js'], {
+  // Use process.execPath (Node.js binary from Electron) instead of 'node'
+  // This ensures Node.js is found even when app is packaged
+  const nodePath = process.execPath;
+  log.info(`Using Node.js: ${nodePath}`);
+
+  backendProcess = spawn(nodePath, ['server.js'], {
     cwd: backendDir,
     env: {
       ...process.env,
