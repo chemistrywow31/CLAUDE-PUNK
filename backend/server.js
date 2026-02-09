@@ -887,11 +887,21 @@ app.use('/api', createRESTRouter(sessionManager, fileWatcher, broadcast));
 // Health check
 app.get('/health', (_req, res) => res.json({ ok: true }));
 
-// Start server with dynamic port allocation
+// Start server with port allocation
 (async () => {
   try {
-    // Find available port (use DEFAULT_BACKEND_PORT or scan range)
-    const port = await findAvailablePort();
+    let port;
+
+    // Check if PORT is set by Electron or environment
+    if (process.env.PORT) {
+      port = parseInt(process.env.PORT, 10);
+      console.log(`[Claude Punk] Using port from environment: ${port}`);
+    } else {
+      // Development mode: find available port dynamically
+      port = await findAvailablePort();
+      console.log(`[Claude Punk] Dynamic port allocated: ${port} (range: 13000-13999)`);
+    }
+
     CONFIG.port = port;
 
     httpServer.listen(port, CONFIG.host, () => {
@@ -900,7 +910,6 @@ app.get('/health', (_req, res) => res.json({ ok: true }));
       console.log(`[Claude Punk] Shell: ${CONFIG.shell}`);
       console.log(`[Claude Punk] Auto-run Claude: ${CONFIG.autoRunClaude}`);
       console.log(`[Claude Punk] Max sessions: ${CONFIG.maxSessions}`);
-      console.log(`[Claude Punk] Dynamic port allocated: ${port} (range: 13000-13999)`);
     });
   } catch (error) {
     console.error(`[Claude Punk] Failed to start server: ${error.message}`);
