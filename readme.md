@@ -77,14 +77,21 @@ Open `http://localhost:5173` in your browser. That's it.
 
 1. Open `http://localhost:5173` in your browser
 2. Click the **door** on the right side of the bar to open the folder picker
-3. Select a project directory — a new agent session spawns
-4. The character walks from the door to an empty seat, with a hotkey label `(a)` above their name
-5. Press the hotkey letter (e.g. `a`) to open the dialog, or click on the character directly
-6. The dialog panel has 3 tabs:
+3. The folder picker lets you:
+   - **Browse directories** — navigate the file system with breadcrumb navigation and a back button
+   - **Recent folders** — quickly reuse up to 10 previously opened directories (persisted in localStorage)
+   - **Choose agent type** — select **Claude Code** or **Codex** via radio buttons before spawning
+   - **Enter path manually** — type a path directly and press Enter
+4. Select a project directory and click **Enter Bar** — a new agent session spawns
+5. The character walks from the door to an empty seat, with a hotkey label `(a)` above their name
+6. Press the hotkey letter (e.g. `a`) to open the dialog, or click on the character directly
+7. The dialog panel has 3 tabs:
    - **Terminal** — live xterm.js terminal with a **File Warp** sidebar on the left. Click any file or folder name in the sidebar to insert its path into the terminal.
-   - **Files** — split view with a file tree sidebar (left) and a **Monaco code editor + preview** pane (right). Click a file to open it. Markdown, HTML, and SVG files open in rendered preview by default — toggle the `CODE` button to see source. Toggle `READ-ONLY` to `EDITING` mode and hit `SAVE` to write changes back to disk.
+   - **Files** — split view with a file tree sidebar (left) and a **Monaco code editor + preview** pane (right). Click a file to open it. Markdown, HTML, and SVG files open in rendered preview by default — toggle the `CODE` button to see source. Toggle `READ-ONLY` to `EDITING` mode and hit `SAVE` to write changes back to disk. Use the `+` / `+▢` buttons to **create new files/folders**, and the `×` button on any item to **delete** it.
    - **Config** — `.claude/` configuration files
-7. Press `Ctrl+`` ` to close the dialog (works even when the terminal has focus), or click the X button
+8. The dialog header shows: session state badge, estimated cost (tokens + dollars), and a red **KILL** button to terminate the session
+9. Press `Ctrl+`` ` to close the dialog (works even when the terminal has focus), or click the X button
+10. A color legend at the bottom of the screen shows **● claude** (amber) and **● codex** (blue) to distinguish agent types
 
 ### Jukebox
 
@@ -134,6 +141,21 @@ Each character shows a pixel-art speech bubble above their head summarizing what
 - Summary text is capped at 20 characters for a clean look
 - Styled with the cyberpunk color palette: dark panel background with neon cyan border
 
+### Volume Control
+
+A floating volume control widget appears in the bottom-right corner of the screen.
+
+- Adjust the master volume slider (0–100) or click the mute button to toggle mute
+- Volume syncs across the Jukebox and Retro TV — one slider controls both
+
+### Auto-Reconnect
+
+If the WebSocket connection drops, the frontend automatically reconnects with exponential backoff (1s → 30s max).
+
+- A connection status indicator shows **● ONLINE** (green) or **● OFFLINE** (red)
+- On reconnect, the backend replays cached terminal output so xterm sessions restore their display
+- Stale patrons (sessions the backend no longer knows about) are cleaned up automatically
+
 ## Keyboard Shortcuts
 
 | Shortcut | Context | Action |
@@ -141,6 +163,7 @@ Each character shows a pixel-art speech bubble above their head summarizing what
 | `Ctrl+`` ` | Anywhere | Close any open overlay (dialog, folder picker, jukebox, retro TV) |
 | `Escape` | When not focused in terminal | Close current overlay |
 | `a` - `z` | Bar scene (no overlay open) | Open dialog for the patron with that hotkey letter |
+| `Shift+D` | Bar scene (dev mode) | Spawn a demo patron or feed sample terminal output for testing |
 
 - Hotkey letters are assigned in order (`a`, `b`, `c`...) as patrons enter the bar
 - When a session terminates, its letter is freed and recycled for the next patron
@@ -263,14 +286,21 @@ npm run dev        # 一個指令同時啟動前後端
 
 1. 在瀏覽器中開啟 `http://localhost:5173`
 2. 點擊酒吧右側的**門**開啟資料夾選擇器
-3. 選擇專案目錄 —— 一個新的 Agent session 會啟動
-4. 角色從門走到空座位，名字上方顯示快捷鍵標籤 `(a)`
-5. 按下快捷鍵字母（如 `a`）開啟對話面板，或直接點擊角色
-6. 對話面板有 3 個分頁：
+3. 資料夾選擇器提供：
+   - **瀏覽目錄** —— 透過麵包屑導航和返回按鈕瀏覽檔案系統
+   - **最近資料夾** —— 快速重開最近使用過的 10 個目錄（儲存於 localStorage）
+   - **選擇 Agent 類型** —— 透過單選按鈕選擇 **Claude Code** 或 **Codex**
+   - **手動輸入路徑** —— 直接輸入路徑並按 Enter
+4. 選擇專案目錄後點 **Enter Bar** —— 一個新的 Agent session 會啟動
+5. 角色從門走到空座位，名字上方顯示快捷鍵標籤 `(a)`
+6. 按下快捷鍵字母（如 `a`）開啟對話面板，或直接點擊角色
+7. 對話面板有 3 個分頁：
    - **Terminal** —— 即時 xterm.js 終端機，左側有 **File Warp** 側欄。點擊側欄中的檔案或資料夾名稱，即可將路徑插入終端機。
-   - **Files** —— 左側檔案樹 + 右側 **Monaco 程式碼編輯器 + 預覽**。點擊檔案即可開啟。Markdown、HTML、SVG 檔案預設以渲染預覽開啟 —— 點 `CODE` 按鈕切換原始碼。切換 `READ-ONLY` 為 `EDITING` 模式後按 `SAVE` 即可寫回磁碟。
+   - **Files** —— 左側檔案樹 + 右側 **Monaco 程式碼編輯器 + 預覽**。點擊檔案即可開啟。Markdown、HTML、SVG 檔案預設以渲染預覽開啟 —— 點 `CODE` 按鈕切換原始碼。切換 `READ-ONLY` 為 `EDITING` 模式後按 `SAVE` 即可寫回磁碟。使用 `+` / `+▢` 按鈕**新增檔案/資料夾**，點擊項目旁的 `×` 按鈕可**刪除**。
    - **Config** —— `.claude/` 設定檔
-7. 按 `Ctrl+`` ` 關閉對話面板（即使終端機獲得焦點時也有效），或點擊 X 按鈕
+8. 對話面板標題列顯示：session 狀態標籤、預估費用（token 數 + 美元）、以及紅色 **KILL** 按鈕可終止 session
+9. 按 `Ctrl+`` ` 關閉對話面板（即使終端機獲得焦點時也有效），或點擊 X 按鈕
+10. 畫面底部的顏色圖例顯示 **● claude**（琥珀色）和 **● codex**（藍色）以區分 Agent 類型
 
 ### 點唱機（Jukebox）
 
@@ -320,6 +350,21 @@ npm run dev        # 一個指令同時啟動前後端
 - 摘要文字限制 20 字元以保持整潔
 - 風格遵循賽博龐克配色：深色面板背景搭配霓虹青色邊框
 
+### 音量控制（Volume Control）
+
+畫面右下角有一個浮動的音量控制元件。
+
+- 調整主音量滑桿（0–100）或點擊靜音按鈕切換靜音
+- 音量在點唱機和復古電視之間同步 —— 一個滑桿同時控制兩者
+
+### 自動重連（Auto-Reconnect）
+
+當 WebSocket 連線中斷時，前端會自動以指數退避策略重新連線（1 秒 → 最長 30 秒）。
+
+- 連線狀態指示器顯示 **● ONLINE**（綠色）或 **● OFFLINE**（紅色）
+- 重連後，後端會重播快取的終端機輸出，讓 xterm session 恢復顯示
+- 過期的客人角色（後端已不存在的 session）會自動清除
+
 ## 快捷鍵
 
 | 快捷鍵 | 情境 | 動作 |
@@ -327,6 +372,7 @@ npm run dev        # 一個指令同時啟動前後端
 | `Ctrl+`` ` | 任何時候 | 關閉任何開啟的覆蓋層（對話面板、資料夾選擇器、點唱機、復古電視） |
 | `Escape` | 非終端機焦點時 | 關閉當前覆蓋層 |
 | `a` - `z` | 酒吧場景（無覆蓋層開啟時） | 開啟對應快捷鍵字母的客人對話面板 |
+| `Shift+D` | 酒吧場景（開發模式） | 產生測試客人或對現有客人傳送範例終端輸出 |
 
 - 快捷鍵字母按客人進入酒吧的順序分配（`a`、`b`、`c`...）
 - 當 session 結束時，字母會被釋放並回收給下一位客人
