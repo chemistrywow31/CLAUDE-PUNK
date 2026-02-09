@@ -78,6 +78,7 @@ export default class BarScene extends Phaser.Scene {
     this.drawNeonSigns();
     this.setupWebSocketListeners();
     this.setupDemoMode();
+    this.setupMusicNotePolling();
   }
 
   // --- Placeholder Texture Generation ---------------------------------
@@ -960,6 +961,27 @@ export default class BarScene extends Phaser.Scene {
 
   }
 
+  setupMusicNotePolling() {
+    this._musicWasPlaying = false;
+
+    this.time.addEvent({
+      delay: 500,
+      loop: true,
+      callback: () => {
+        const isPlaying = jukeboxAudio.playing || retroTvPlayer.playing;
+        if (isPlaying === this._musicWasPlaying) return;
+        this._musicWasPlaying = isPlaying;
+
+        for (const [, patron] of this.patrons) {
+          if (isPlaying) {
+            patron.character.showMusicNote();
+          } else {
+            patron.character.hideMusicNote();
+          }
+        }
+      },
+    });
+  }
 
   drawNeonSigns() {
     // -- "CLAUDE PUNK" neon sign -- isometric tilt matching 2.5D perspective --

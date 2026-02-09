@@ -163,6 +163,12 @@ export default class Character {
     if (BUBBLE_ENABLED) {
       this.speechBubble = new SpeechBubble(this.scene, this);
     }
+
+    // Show music note if music is already playing when this character sits down
+    if (this._pendingMusicNote) {
+      this._pendingMusicNote = false;
+      this.showMusicNote();
+    }
   }
 
   setPose(pose) {
@@ -276,6 +282,13 @@ export default class Character {
       this.speechBubble = null;
     }
 
+    if (this.musicNote) {
+      if (this.musicNoteTween) this.musicNoteTween.stop();
+      this.musicNote.destroy();
+      this.musicNote = null;
+      this.musicNoteTween = null;
+    }
+
     if (this.sprite) {
       this.sprite.disableInteractive();
       this.scene.tweens.add({
@@ -309,6 +322,73 @@ export default class Character {
     if (this.speechBubble) {
       this.speechBubble.onTerminalOutput(data);
     }
+  }
+
+  /**
+   * Show a small swaying music note next to the character.
+   * Randomly picks left or right side each time.
+   */
+  showMusicNote() {
+    if (this.destroyed || this.musicNote) return;
+    if (!this.isSeated) {
+      this._pendingMusicNote = true;
+      return;
+    }
+
+    const side = Phaser.Math.Between(0, 1) === 0 ? -1 : 1;
+    const offsetX = side * 35;
+    const noteX = this.sprite.x + offsetX;
+    const noteY = this.sprite.y - 100;
+
+    this.musicNote = this.scene.add.text(noteX, noteY, '\u266A', {
+      fontSize: '22px',
+      fontFamily: 'Rajdhani, sans-serif',
+      color: '#ff0080',
+      stroke: '#0a0a14',
+      strokeThickness: 3,
+    });
+    this.musicNote.setOrigin(0.5, 0.5);
+    this.musicNote.setDepth(12);
+    this.musicNote.setAlpha(0);
+
+    // Fade in
+    this.scene.tweens.add({
+      targets: this.musicNote,
+      alpha: 1,
+      duration: 300,
+    });
+
+    // Sway: oscillate rotation and y position
+    this.musicNoteTween = this.scene.tweens.add({
+      targets: this.musicNote,
+      y: noteY - 6,
+      rotation: { from: -0.25, to: 0.25 },
+      duration: 600 + Phaser.Math.Between(0, 200),
+      yoyo: true,
+      repeat: -1,
+      ease: 'Sine.easeInOut',
+    });
+  }
+
+  /** Hide and destroy the music note. */
+  hideMusicNote() {
+    this._pendingMusicNote = false;
+    if (!this.musicNote) return;
+
+    if (this.musicNoteTween) {
+      this.musicNoteTween.stop();
+      this.musicNoteTween = null;
+    }
+
+    const note = this.musicNote;
+    this.musicNote = null;
+
+    this.scene.tweens.add({
+      targets: note,
+      alpha: 0,
+      duration: 300,
+      onComplete: () => note.destroy(),
+    });
   }
 
   getPosition() {
