@@ -26,24 +26,28 @@ export default class Jukebox {
 
     panel.innerHTML = `
       <div class="jukebox-header">
-        <span class="jukebox-title">Jukebox</span>
+        <div class="jukebox-tabs">
+          <button class="jukebox-tab active" data-tab="music">Music</button>
+        </div>
         <button class="jukebox-close">\u00D7</button>
       </div>
-      <div class="jukebox-now-playing">No track loaded</div>
-      <div class="jukebox-controls">
-        <button class="jukebox-btn jukebox-play" title="Play / Pause">\u25B6</button>
-        <button class="jukebox-btn jukebox-next" title="Next">\u23ED</button>
-        <button class="jukebox-btn jukebox-loop" title="Loop mode: ALL">ALL</button>
-        <div class="jukebox-volume">
-          <label>VOL</label>
-          <input type="range" min="0" max="100" value="60" />
+      <div class="jukebox-content-music">
+        <div class="jukebox-now-playing">No track loaded</div>
+        <div class="jukebox-controls">
+          <button class="jukebox-btn jukebox-play" title="Play / Pause">\u25B6</button>
+          <button class="jukebox-btn jukebox-next" title="Next">\u23ED</button>
+          <button class="jukebox-btn jukebox-loop" title="Loop mode: ALL">ALL</button>
+          <div class="jukebox-volume">
+            <label>VOL</label>
+            <input type="range" min="0" max="100" value="60" />
+          </div>
         </div>
-      </div>
-      <div class="jukebox-upload">
-        <button class="jukebox-upload-btn">+ Upload Tracks</button>
-      </div>
-      <div class="jukebox-playlist">
-        <div class="jukebox-playlist-empty">No tracks uploaded yet</div>
+        <div class="jukebox-upload">
+          <button class="jukebox-upload-btn">+ Upload Tracks</button>
+        </div>
+        <div class="jukebox-playlist">
+          <div class="jukebox-playlist-empty">No tracks uploaded yet</div>
+        </div>
       </div>
     `;
 
@@ -117,6 +121,7 @@ export default class Jukebox {
   hide() {
     this.visible = false;
     this.overlay.classList.add('hidden');
+
     if (this.onHide) this.onHide();
   }
 

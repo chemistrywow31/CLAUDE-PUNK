@@ -1472,13 +1472,19 @@ export default class BarScene extends Phaser.Scene {
   }
 
   showLogModal(logContent) {
+    // Get canvas actual size and position
+    const canvas = this.sys.game.canvas;
+    const canvasRect = canvas.getBoundingClientRect();
+    const scaleX = canvasRect.width / this.sys.game.config.width;
+    const scaleY = canvasRect.height / this.sys.game.config.height;
+
     // Create semi-transparent overlay
     const overlay = this.add.rectangle(0, 0, 1920, 1080, 0x000000, 0.85);
     overlay.setOrigin(0, 0);
     overlay.setDepth(1000);
     overlay.setInteractive();
 
-    // Modal container
+    // Modal container (game coordinates)
     const modalWidth = 1600;
     const modalHeight = 900;
     const modalX = 960;
@@ -1504,13 +1510,19 @@ export default class BarScene extends Phaser.Scene {
     title.setOrigin(0.5, 0.5);
     title.setDepth(1003);
 
+    // Calculate DOM position and size based on canvas scale
+    const contentGameX = modalX - modalWidth / 2 + 40;
+    const contentGameY = modalY - modalHeight / 2 + 100;
+    const contentGameWidth = modalWidth - 80;
+    const contentGameHeight = modalHeight - 180;
+
     // Log content area (using HTML DOM for scrolling)
     const contentDiv = document.createElement('div');
     contentDiv.style.position = 'absolute';
-    contentDiv.style.left = `${modalX - modalWidth / 2 + 40}px`;
-    contentDiv.style.top = `${modalY - modalHeight / 2 + 100}px`;
-    contentDiv.style.width = `${modalWidth - 80}px`;
-    contentDiv.style.height = `${modalHeight - 180}px`;
+    contentDiv.style.left = `${canvasRect.left + contentGameX * scaleX}px`;
+    contentDiv.style.top = `${canvasRect.top + contentGameY * scaleY}px`;
+    contentDiv.style.width = `${contentGameWidth * scaleX}px`;
+    contentDiv.style.height = `${contentGameHeight * scaleY}px`;
     contentDiv.style.backgroundColor = '#0a0a14';
     contentDiv.style.color = '#e0e0e0';
     contentDiv.style.fontFamily = 'JetBrains Mono, Courier New, monospace';
