@@ -6,7 +6,7 @@
  * Characters randomly switch poses every 3-8 seconds for liveliness.
  */
 
-import { POSE, CHARACTER_POSES, POSE_MIN_DURATION, POSE_MAX_DURATION, CHARACTER_VARIANT_COUNT } from '../config/animations.js';
+import { POSE, CHARACTER_POSES, POSE_MIN_DURATION, POSE_MAX_DURATION, CHARACTER_VARIANT_COUNT, HIDDEN_VARIANTS, HIDDEN_VARIANT_WEIGHT } from '../config/animations.js';
 import { DOOR_POSITION } from '../config/seats.js';
 import { BUBBLE_ENABLED } from '../config/bubbles.js';
 import SpeechBubble from './SpeechBubble.js';
@@ -40,6 +40,24 @@ const FRAME_CORRECTIONS = {
 };
 
 export default class Character {
+  /**
+   * Pick a character variant with weighted probability.
+   * Regular variants (0-7) have weight 1.0, hidden variants have lower weight.
+   */
+  static pickWeightedVariant() {
+    const weights = [];
+    for (let i = 0; i < CHARACTER_VARIANT_COUNT; i++) {
+      weights.push(HIDDEN_VARIANTS.includes(i) ? HIDDEN_VARIANT_WEIGHT : 1.0);
+    }
+    const totalWeight = weights.reduce((sum, w) => sum + w, 0);
+    let roll = Math.random() * totalWeight;
+    for (let i = 0; i < weights.length; i++) {
+      roll -= weights[i];
+      if (roll <= 0) return i;
+    }
+    return 0;
+  }
+
   constructor(scene, sessionId, seat, label, agentType = 'claude') {
     this.scene = scene;
     this.sessionId = sessionId;
@@ -54,8 +72,8 @@ export default class Character {
     this.isSeated = false;
     this.destroyed = false;
 
-    // Pick a random character variant (for visual diversity)
-    this.variant = Phaser.Math.Between(0, CHARACTER_VARIANT_COUNT - 1);
+    // Pick a weighted random character variant (hidden variants are rarer)
+    this.variant = Character.pickWeightedVariant();
 
     // Speech bubble (created after sprite + label exist)
     this.speechBubble = null;

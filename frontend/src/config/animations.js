@@ -14,8 +14,14 @@ export const POSE = {
 // All available poses — the character randomly switches between these
 export const CHARACTER_POSES = [POSE.IDLE, POSE.DRINKING, POSE.LEANING, POSE.LOOKING];
 
-// Total number of character variants
-export const CHARACTER_VARIANT_COUNT = 8;
+// Total number of character variants (0-7 regular, 8-9 hidden/rare)
+export const CHARACTER_VARIANT_COUNT = 10;
+
+// Hidden character variant indices (lower spawn probability)
+export const HIDDEN_VARIANTS = [8, 9];
+
+// Spawn weight: hidden variants have 1/5 the chance of regular ones
+export const HIDDEN_VARIANT_WEIGHT = 0.2;
 
 // Animation definitions (used when real sprite sheets are loaded)
 const variantIndices = Array.from({ length: CHARACTER_VARIANT_COUNT }, (_, i) => i);

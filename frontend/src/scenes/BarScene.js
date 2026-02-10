@@ -60,6 +60,9 @@ export default class BarScene extends Phaser.Scene {
     for (let i = 0; i < 8; i++) {
       this.load.atlas(`character-${i}`, `/assets/sprites/characters/character-${i}.png`, `/assets/sprites/characters/character-${i}.json`);
     }
+    // Hidden characters
+    this.load.atlas('character-8', '/assets/sprites/characters/character-8-silverhand.png', '/assets/sprites/characters/character-8-silverhand.json');
+    this.load.atlas('character-9', '/assets/sprites/characters/character-9-mj.png', '/assets/sprites/characters/character-9-mj.json');
     this.load.atlas('bartender', '/assets/sprites/characters/bartender.png', '/assets/sprites/characters/bartender.json');
     this.load.atlas('drinks', '/assets/sprites/objects/drinks.png', '/assets/sprites/objects/drinks.json');
     this.load.image('neon-sign', '/assets/sprites/ui/neon-sign-main.png');
@@ -102,6 +105,10 @@ export default class BarScene extends Phaser.Scene {
       { body: 0x2a2a2a, hair: 0xf04040, skin: 0xc49464 },
       { body: 0x3a3a2a, hair: 0x6060ff, skin: 0xb48454 },
       { body: 0x2a3a3a, hair: 0xe0e0e0, skin: 0xd4a574 },
+      // Hidden: Johnny Silverhand
+      { body: 0x1a1a2a, hair: 0x1a1a2a, skin: 0xd4a574 },
+      // Hidden: Michael Jackson
+      { body: 0xff0080, hair: 0x0a0a14, skin: 0xd4a574 },
     ];
 
     charColors.forEach((colors, i) => {

@@ -778,3 +778,176 @@ CRITICAL STYLE RULES:
 | BGM Track 2 (Neon Rain) | `assets/audio/bgm-bar-ambient-2.mp3` |
 | BGM Track 3 (Terminal Groove) | `assets/audio/bgm-bar-ambient-3.mp3` |
 | BGM Track 4 (Deep Protocol) | `assets/audio/bgm-bar-ambient-4.mp3` |
+| **Hidden: Johnny Silverhand** | `assets/sprites/characters/character-8-silverhand.png` + `.json` |
+| **Hidden: Michael Jackson** | `assets/sprites/characters/character-9-mj.png` + `.json` |
+
+---
+
+## 11. Hidden Character 8 — Johnny Silverhand (Keanu Reeves)
+
+**File**: `assets/sprites/characters/character-8-silverhand.png`
+**Atlas**: `assets/sprites/characters/character-8-silverhand.json`
+**Dimensions**: 128x64 pixels (4 frames x 32x64 each)
+
+**Prompt**:
+```
+Pixel art sprite sheet, 128x64 pixels total, 4 frames of 32x64 each, horizontal strip
+on a solid bright green (#00ff00) background.
+Cyberpunk chibi FULL-BODY character in sitting pose, CHARACTER ONLY — NO chair, NO stool,
+NO table, NO furniture of any kind. Large head (~40% body height).
+CRITICAL: Draw the COMPLETE FULL BODY from head to feet — head, torso, arms, hands,
+legs, and feet/shoes must ALL be visible. Do NOT crop at the waist or chest.
+The character should fill most of the 32x64 frame vertically: head at top, feet near bottom.
+IMPORTANT: The bright green (#00ff00) is the chroma key color — use it for ALL areas
+that are not part of the character. Do NOT use any green (#00ff00) on the character itself.
+
+CHARACTER DESIGN — Johnny Silverhand (Keanu Reeves from Cyberpunk 2077):
+- Long, messy jet-black hair (#1a1a2a) past the shoulders, with a slight wave
+- Dark aviator sunglasses (#0a0a14) with faint cyan lens reflection (#00f0ff, 1px)
+- Rugged stubble/short beard on jawline (#2a2a3a)
+- LEFT ARM is a CHROME CYBERNETIC PROSTHETIC — bright silver metal (#aaaacc) with
+  cyan (#00f0ff) glowing joints and seam lines. Segmented mechanical fingers.
+  This is his most iconic feature — make it clearly metallic and distinct from skin.
+- Right arm: normal, light skin (#d4a574)
+- Dark leather jacket (#1a1a2a) with popped collar, over a faded black tank top
+- Military dog tags (#8888aa) hanging from neck — 2 small metallic rectangles
+- Silver ring on right hand (#aaaacc, 1px)
+- Dark jeans (#1a1a2a) with a chain detail (#8888aa, 1px) at the hip
+- Heavy black combat boots (#0a0a14) with silver buckle accents (#aaaacc)
+- Lean, rock-star build
+
+FULL BODY LAYOUT (within each 32x64 frame):
+- Head + hair: rows 0-24 (top)
+- Torso + arms: rows 24-42 (middle)
+- Legs + boots: rows 42-62 (bottom, feet touching near frame bottom)
+
+PERSONALITY: Rebellious rocker ghost, intense and brooding. The kind of guy
+who lights a cigarette in a no-smoking bar and nobody dares say a word.
+
+4 FRAMES (left to right):
+Frame 1: IDLE SITTING — slouched back, chrome left arm resting on knee,
+  right arm on thigh, sunglasses reflecting faint cyan glow, cool detached expression.
+Frame 2: DRINKING — chrome left arm holds a glowing amber (#ffaa00) whiskey glass,
+  raised to mouth, metallic fingers wrapped around glass with cyan joint glow visible.
+Frame 3: LEANING — leaning forward on chrome left arm, right hand touching dog tags,
+  contemplative pose, hair falling forward slightly.
+Frame 4: LOOKING AROUND — head turned right, sunglasses catching pink neon reflection
+  (#ff0080, 1px on lens), chrome arm resting on counter, alert and scanning the room.
+
+Style: strict pixel art, no anti-aliasing, no gradients, 1px outlines.
+The chrome arm should clearly contrast with skin — use bright metallic pixels (#aaaacc, #8888aa)
+with cyan (#00f0ff) accent lines at joints and knuckles.
+The background must be pure solid bright green (#00ff00) with no patterns or textures.
+Do NOT use any green (#00ff00) on the character itself — only for the background.
+References: Keanu Reeves as Johnny Silverhand in Cyberpunk 2077,
+cyberpunk rocker aesthetic, chrome prosthetic arm prominently visible.
+```
+
+**Post-processing**: Replace bright green (#00ff00) with transparency. Final sheet: 128x64.
+
+### Silverhand Atlas JSON
+
+```json
+{
+  "frames": {
+    "char-idle-8":  { "frame": { "x": 0,  "y": 0, "w": 32, "h": 64 } },
+    "char-drink-8": { "frame": { "x": 32, "y": 0, "w": 32, "h": 64 } },
+    "char-lean-8":  { "frame": { "x": 64, "y": 0, "w": 32, "h": 64 } },
+    "char-look-8":  { "frame": { "x": 96, "y": 0, "w": 32, "h": 64 } }
+  },
+  "meta": {
+    "image": "character-8-silverhand.png",
+    "size": { "w": 128, "h": 64 },
+    "scale": 1
+  }
+}
+```
+
+---
+
+## 12. Hidden Character 9 — Michael Jackson (Neon Thriller)
+
+**File**: `assets/sprites/characters/character-9-mj.png`
+**Atlas**: `assets/sprites/characters/character-9-mj.json`
+**Dimensions**: 128x64 pixels (4 frames x 32x64 each)
+
+**Prompt**:
+```
+Pixel art sprite sheet, 128x64 pixels total, 4 frames of 32x64 each, horizontal strip
+on a solid bright green (#00ff00) background.
+Cyberpunk chibi FULL-BODY character in sitting pose, CHARACTER ONLY — NO chair, NO stool,
+NO table, NO furniture of any kind. Large head (~40% body height).
+CRITICAL: Draw the COMPLETE FULL BODY from head to feet — head, torso, arms, hands,
+legs, and feet/shoes must ALL be visible. Do NOT crop at the waist or chest.
+The character should fill most of the 32x64 frame vertically: head at top, feet near bottom.
+IMPORTANT: The bright green (#00ff00) is the chroma key color — use it for ALL areas
+that are not part of the character. Do NOT use any green (#00ff00) on the character itself.
+
+CHARACTER DESIGN — Michael Jackson (cyberpunk Thriller era):
+- Iconic curly black hair (#0a0a14) with volume, swept to the right side,
+  with subtle purple highlights (#8040c0) catching neon light on the curls
+- Lighter skin (#d4a574), sharp angular face, thin eyebrows
+- Dark eyes with a charismatic, confident sparkle (white pixel highlight)
+- BLACK FEDORA HAT (#1a1a2a) with a thin cyan (#00f0ff) neon band around
+  the crown — tilted slightly forward at a stylish angle
+- ICONIC RED JACKET: bright neon pink/red (#ff0080) military-style jacket
+  with multiple horizontal black buckle straps across the chest (#0a0a14),
+  sharp shoulder pads, and high collar. The jacket has cyan (#00f0ff) 1-pixel
+  accent stitching along the shoulder seams and collar edge.
+- RIGHT HAND wears a single WHITE SEQUINED GLOVE (#e0e0e0) with sparkle
+  pixels — tiny alternating bright white (#ffffff) dots to suggest glitter.
+  Left hand is bare with light skin.
+- Black high-waisted pants (#1a1a2a) with a thin silver belt (#8888aa)
+- Iconic white socks (#e0e0e0) visible at ankles — a signature MJ detail
+- Black penny loafers (#0a0a14) with a subtle shine pixel (#2a2a3a)
+- Slim, dancer's build — even while sitting, posture has an elegant energy
+
+FULL BODY LAYOUT (within each 32x64 frame):
+- Fedora + head + hair: rows 0-24 (top)
+- Torso + red jacket + arms: rows 24-42 (middle)
+- Legs + white socks + loafers: rows 42-62 (bottom, feet touching near frame bottom)
+
+PERSONALITY: The King of Pop, even in a cyberpunk bar he commands the room.
+Effortlessly cool, every gesture is a performance.
+
+4 FRAMES (left to right):
+Frame 1: IDLE SITTING — elegant upright posture, gloved right hand resting
+  on knee with sparkle pixels visible, left hand on thigh, fedora tilted forward,
+  slight confident smile, one leg crossed over the other.
+Frame 2: DRINKING — gloved right hand elegantly holds a glowing purple (#8040c0)
+  cocktail glass, pinky finger slightly extended, raised toward lips with grace,
+  fedora brim casting a small shadow pixel on the face.
+Frame 3: LEANING — leaning to the right on bare left arm, gloved right hand
+  touching the brim of the fedora in an iconic tip-the-hat gesture, relaxed
+  but stylish pose, slight head tilt.
+Frame 4: LOOKING AROUND — head turned left, fedora profile visible, gloved hand
+  raised near chin in a thoughtful pose (like about to snap fingers), scanning
+  the bar with star-quality composure.
+
+Style: strict pixel art, no anti-aliasing, no gradients, 1px outlines.
+The red jacket (#ff0080) must POP against the bright green background — it's his signature.
+The single white glove (#e0e0e0) should be clearly visible on only the RIGHT hand.
+The background must be pure solid bright green (#00ff00) with no patterns or textures.
+Do NOT use any green (#00ff00) on the character itself — only for the background.
+References: Michael Jackson Thriller/Bad era red jacket, single white glove,
+black fedora, military buckle jacket, cyberpunk neon reinterpretation.
+```
+
+**Post-processing**: Replace bright green (#00ff00) with transparency. Final sheet: 128x64.
+
+### MJ Atlas JSON
+
+```json
+{
+  "frames": {
+    "char-idle-9":  { "frame": { "x": 0,  "y": 0, "w": 32, "h": 64 } },
+    "char-drink-9": { "frame": { "x": 32, "y": 0, "w": 32, "h": 64 } },
+    "char-lean-9":  { "frame": { "x": 64, "y": 0, "w": 32, "h": 64 } },
+    "char-look-9":  { "frame": { "x": 96, "y": 0, "w": 32, "h": 64 } }
+  },
+  "meta": {
+    "image": "character-9-mj.png",
+    "size": { "w": 128, "h": 64 },
+    "scale": 1
+  }
+}

@@ -6,7 +6,7 @@
   "scripts": {
     "start": "node server.js",
     "dev": "node --watch server.js",
-    "postinstall": "chmod +x node_modules/node-pty/prebuilds/darwin-*/spawn-helper 2>/dev/null || true"
+    "postinstall": "node -e \"const{platform}=require('os');if(platform()==='darwin'){require('child_process').execSync('chmod +x node_modules/node-pty/prebuilds/darwin-*/spawn-helper',{stdio:'ignore'}).toString()}\" || true"
   },
   "dependencies": {
     "chokidar": "^3.6.0",
