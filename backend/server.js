@@ -22,26 +22,13 @@ import http from 'node:http';
 
 const IS_WINDOWS = process.platform === 'win32';
 
-/** Resolve a CLI command to its absolute path, falling back to the bare name. */
-function resolveCommand(name) {
-  try {
-    const cmd = IS_WINDOWS ? `where ${name}` : `which ${name}`;
-    const result = execSync(cmd, { encoding: 'utf8' }).trim();
-    // `where` on Windows may return multiple lines; take the first
-    return result.split(/\r?\n/)[0];
-  } catch {
-    console.warn(`[config] Could not resolve command "${name}" — using bare name as fallback`);
-    return name;
-  }
-}
+// ── Shell detection (runs once at startup, sets flags for everything else) ───
 
 /** Detect the default shell for the current platform. */
 function detectShell() {
   if (IS_WINDOWS) {
-    // Allow user override via env var
     if (process.env.CLAUDE_PUNK_SHELL) return process.env.CLAUDE_PUNK_SHELL;
 
-    // Prefer Git Bash if installed
     const gitBashPaths = [
       path.join(process.env.ProgramFiles || 'C:\\Program Files', 'Git', 'bin', 'bash.exe'),
       path.join(process.env['ProgramFiles(x86)'] || 'C:\\Program Files (x86)', 'Git', 'bin', 'bash.exe'),
@@ -55,37 +42,100 @@ function detectShell() {
       } catch { /* not found, try next */ }
     }
 
-    // Fallback to cmd.exe
     return process.env.COMSPEC || 'cmd.exe';
   }
   return process.env.SHELL || '/bin/zsh';
 }
 
+const DETECTED_SHELL = detectShell();
+const IS_GIT_BASH = IS_WINDOWS && DETECTED_SHELL.toLowerCase().includes('bash');
+
+console.log(`[config] Shell: ${DETECTED_SHELL} (IS_GIT_BASH=${IS_GIT_BASH})`);
+
 /** Get shell arguments for the current platform. */
-function getShellArgs(shell) {
-  if (IS_WINDOWS) {
-    // Git Bash needs --login for proper PATH setup
-    if (shell && shell.toLowerCase().includes('bash')) return ['--login'];
-    return [];
-  }
-  return ['-l'];                       // Unix login shell
+function getShellArgs() {
+  if (IS_WINDOWS) return IS_GIT_BASH ? ['--login'] : [];
+  return ['-l'];
 }
 
-const _detectedShell = detectShell();
+/** Resolve a CLI command to its absolute path, falling back to the bare name. */
+function resolveCommand(name) {
+  if (IS_GIT_BASH) {
+    // Git Bash: `which` first (matches what the PTY shell actually sees)
+    try {
+      const result = execSync(`"${DETECTED_SHELL}" -lc "which ${name}"`, { encoding: 'utf8' }).trim();
+      if (result && !result.includes('not found')) return result;
+    } catch { /* not found via Git Bash PATH */ }
+    // Fallback to Windows `where`
+    try {
+      const result = execSync(`where ${name}`, { encoding: 'utf8' }).trim();
+      const resolved = result.split(/\r?\n/)[0];
+      if (resolved) return resolved;
+    } catch { /* not found via Windows PATH either */ }
+  } else if (IS_WINDOWS) {
+    // cmd.exe / PowerShell: `where` only
+    try {
+      const result = execSync(`where ${name}`, { encoding: 'utf8' }).trim();
+      const resolved = result.split(/\r?\n/)[0];
+      if (resolved) return resolved;
+    } catch { /* not found */ }
+  } else {
+    // Unix: `which`
+    try {
+      const result = execSync(`which ${name}`, { encoding: 'utf8' }).trim();
+      if (result) return result;
+    } catch { /* not found */ }
+  }
+
+  console.warn(`[config] Could not resolve command "${name}" — using bare name as fallback`);
+  return name;
+}
+
+/**
+ * Build a PATH string that includes directories of all resolved agent commands.
+ * On Windows, Git Bash's login profile can rebuild PATH and drop user-specific
+ * directories (e.g. ~/.local/bin), causing agent commands to be unfindable.
+ */
+function buildEnhancedPath() {
+  const currentPath = process.env.PATH || '';
+  const extraDirs = new Set();
+
+  for (const name of ['claude', 'codex']) {
+    const resolved = resolveCommand(name);
+    if (resolved && resolved !== name) {
+      extraDirs.add(path.dirname(resolved));
+    }
+  }
+
+  if (extraDirs.size === 0) return currentPath;
+
+  const sep = IS_WINDOWS ? ';' : ':';
+  const existing = new Set(currentPath.split(sep).map(p => p.toLowerCase()));
+  const toAdd = [...extraDirs].filter(d => !existing.has(d.toLowerCase()));
+
+  if (toAdd.length === 0) return currentPath;
+
+  console.log(`[config] Adding to PATH for PTY: ${toAdd.join(sep)}`);
+  return toAdd.join(sep) + sep + currentPath;
+}
+
+const _enhancedPath = buildEnhancedPath();
+
 const CONFIG = {
   port: parseInt(process.env.PORT || '3000', 10),
   host: '127.0.0.1',
   maxSessions: 16,
   fileCountRatio: 20,
   autoRunClaude: process.env.AUTO_RUN_CLAUDE !== 'false',
-  shell: _detectedShell,
-  shellArgs: getShellArgs(_detectedShell),
+  shell: DETECTED_SHELL,
+  shellArgs: getShellArgs(),
   lineBufferFlushMs: 100,
   heartbeatIntervalMs: 30_000,
   ringBufferCapacity: 1000,
   ptyDefaultCols: 120,
   ptyDefaultRows: 40,
   autoRunDelayMs: 300,
+  enhancedPath: _enhancedPath,
   agentCommands: {
     claude: `${resolveCommand('claude')} --dangerously-skip-permissions`,
     codex: `${resolveCommand('codex')} --full-auto`,
@@ -324,7 +374,7 @@ class SessionManager extends EventEmitter {
         cwd: workDir,
         cols: CONFIG.ptyDefaultCols,
         rows: CONFIG.ptyDefaultRows,
-        env: { ...process.env, TERM: 'xterm-256color' },
+        env: { ...process.env, TERM: 'xterm-256color', PATH: CONFIG.enhancedPath },
       });
       console.log(`[session] PTY spawned successfully (pid=${proc.pid})`);
     } catch (spawnErr) {
