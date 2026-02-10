@@ -41,9 +41,26 @@
   <div id="game-container">
     <video id="bg-video" autoplay loop muted playsinline></video>
     <script>
-      const bgs = ['bg01.mp4', 'bg02.mp4', 'bg03.mp4'];
+      const bgs = ['bg01.mp4', 'bg02.mp4', 'bg03.mp4', 'bg04.mp4', 'bg05.mp4'];
+      const video = document.getElementById('bg-video');
+      const toSrc = (name) => '/assets/backgrounds/' + name;
+
+      function setBackground(name) {
+        if (!bgs.includes(name)) return;
+        const src = toSrc(name);
+        if (video.getAttribute('src') === src) return;
+        video.setAttribute('src', src);
+        video.dataset.bg = name;
+        video.load();
+        video.play().catch(() => {});
+      }
+
       const pick = bgs[Math.floor(Math.random() * bgs.length)];
-      document.getElementById('bg-video').src = '/assets/backgrounds/' + pick;
+      setBackground(pick);
+
+      window.CLAUDE_PUNK_BG_OPTIONS = bgs.slice();
+      window.CLAUDE_PUNK_SET_BG = setBackground;
+      window.CLAUDE_PUNK_GET_BG = () => video.dataset.bg || pick;
     </script>
   </div>
 
@@ -55,6 +72,9 @@
 
   <!-- Jukebox Overlay -->
   <div id="jukebox-overlay" class="hidden"></div>
+
+  <!-- Theme Settings Overlay -->
+  <div id="theme-settings-overlay" class="hidden"></div>
 
   <!-- Retro TV Mini Player (overlays canvas at TV sprite position) -->
   <div id="retro-tv-mini" class="hidden">

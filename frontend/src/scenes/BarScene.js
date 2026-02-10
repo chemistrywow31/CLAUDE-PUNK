@@ -41,6 +41,7 @@ export default class BarScene extends Phaser.Scene {
     this.dialogBox = null;
     this.jukeboxUI = null;
     this.retroTvUI = null;
+    this.themeSettingsUI = null;
 
     // Session metadata
     this.sessionMeta = new Map();
@@ -1281,6 +1282,20 @@ export default class BarScene extends Phaser.Scene {
       color: '#ff0080',
     });
     this.connectionText.setDepth(20);
+
+    // -- Theme settings link (below connection status) --
+    this.themeSettingsText = this.add.text(30, 92, '⚙ THEME SETTINGS', {
+      fontSize: '17px',
+      fontFamily: 'JetBrains Mono, monospace',
+      color: '#545480',
+    });
+    this.themeSettingsText.setDepth(20);
+    this.themeSettingsText.setInteractive({ useHandCursor: true });
+    this.themeSettingsText.on('pointerover', () => this.themeSettingsText.setColor('#6a6aa6'));
+    this.themeSettingsText.on('pointerout', () => this.themeSettingsText.setColor('#545480'));
+    this.themeSettingsText.on('pointerdown', () => {
+      if (this.themeSettingsUI) this.themeSettingsUI.toggle();
+    });
 
     // -- Seat count --
     this.seatCountText = this.add.text(1890, 16, `${SEATS.length - this.occupiedSeats.size} seats open`, {

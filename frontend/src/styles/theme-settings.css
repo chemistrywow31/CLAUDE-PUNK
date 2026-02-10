@@ -1,0 +1,174 @@
+/* ─── Theme Settings Overlay ─────────────────────────────────── */
+
+#theme-settings-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0, 0, 0, 0.6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1004;
+}
+
+.theme-settings-panel {
+  width: 760px;
+  max-width: 92vw;
+  max-height: 80vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.ts-header {
+  display: flex;
+  align-items: center;
+  padding: 10px 16px;
+  border-bottom: 1px solid rgba(0, 240, 255, 0.2);
+}
+
+.ts-title {
+  font-family: var(--font-ui);
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--border-neon);
+  flex: 1;
+  text-transform: uppercase;
+  letter-spacing: 2px;
+}
+
+.ts-close {
+  background: none;
+  border: 1px solid var(--text-secondary);
+  color: var(--text-secondary);
+  font-size: 18px;
+  width: 28px;
+  height: 28px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.15s;
+}
+
+.ts-close:hover {
+  border-color: var(--border-neon);
+  color: var(--border-neon);
+  box-shadow: 0 0 8px rgba(0, 240, 255, 0.3);
+}
+
+.ts-body {
+  display: flex;
+  min-height: 360px;
+  max-height: 70vh;
+}
+
+.ts-sidebar {
+  width: 180px;
+  border-right: 1px solid rgba(0, 240, 255, 0.2);
+  background: rgba(10, 10, 20, 0.65);
+  padding: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.ts-tab {
+  background: none;
+  border: 1px solid rgba(0, 240, 255, 0.2);
+  color: var(--text-secondary);
+  font-family: var(--font-ui);
+  font-size: 14px;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  padding: 8px 10px;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.ts-tab:hover {
+  color: var(--border-neon);
+  border-color: var(--border-neon);
+  box-shadow: 0 0 8px rgba(0, 240, 255, 0.2);
+}
+
+.ts-tab.active {
+  color: var(--border-neon);
+  border-color: var(--border-neon);
+  box-shadow: 0 0 10px rgba(0, 240, 255, 0.3);
+  background: rgba(0, 240, 255, 0.08);
+}
+
+.ts-content {
+  flex: 1;
+  padding: 16px;
+  overflow: auto;
+}
+
+.ts-tab-panel {
+  display: none;
+}
+
+.ts-tab-panel.active {
+  display: block;
+}
+
+.ts-section-label {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--text-secondary);
+  letter-spacing: 1px;
+  margin-bottom: 10px;
+}
+
+.ts-bg-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  gap: 10px;
+}
+
+.ts-bg-item {
+  background: rgba(10, 10, 20, 0.9);
+  border: 1px solid rgba(0, 240, 255, 0.2);
+  color: var(--text-primary);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  padding: 10px 12px;
+  cursor: pointer;
+  text-align: left;
+  transition: all 0.15s;
+}
+
+.ts-bg-item:hover {
+  border-color: var(--border-neon);
+  color: var(--border-neon);
+  box-shadow: 0 0 10px rgba(0, 240, 255, 0.25);
+}
+
+.ts-bg-item.active {
+  border-color: var(--border-neon);
+  color: var(--border-neon);
+  background: rgba(0, 240, 255, 0.08);
+}
+
+.ts-bg-empty {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+@media (max-width: 720px) {
+  .theme-settings-panel {
+    width: 92vw;
+  }
+
+  .ts-body {
+    flex-direction: column;
+  }
+
+  .ts-sidebar {
+    width: 100%;
+    flex-direction: row;
+  }
+}

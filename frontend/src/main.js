@@ -10,6 +10,7 @@ import FolderPicker from './ui/FolderPicker.js';
 import VolumeControl from './ui/VolumeControl.js';
 import Jukebox from './ui/Jukebox.js';
 import RetroTV from './ui/RetroTV.js';
+import ThemeSettings from './ui/ThemeSettings.js';
 import HotkeyManager from './managers/HotkeyManager.js';
 import retroTvPlayer from './services/retroTvPlayer.js';
 import wsService from './services/websocket.js';
@@ -26,6 +27,7 @@ import './styles/jukebox.css';
 import './styles/retro-tv.css';
 import './styles/file-warp.css';
 import './styles/file-editor.css';
+import './styles/theme-settings.css';
 
 // ─── Game Configuration ─────────────────────────────────────────
 
@@ -80,12 +82,14 @@ game.events.on('ready', () => {
   const folderPicker = new FolderPicker();
   const jukeboxUI = new Jukebox();
   const retroTvUI = new RetroTV();
+  const themeSettingsUI = new ThemeSettings();
 
   // Wire overlays to scene
   scene.dialogBox = dialogBox;
   scene.folderPicker = folderPicker;
   scene.jukeboxUI = jukeboxUI;
   scene.retroTvUI = retroTvUI;
+  scene.themeSettingsUI = themeSettingsUI;
 
   // Hotkey manager — assigns letters to patrons, Ctrl+` closes overlays
   scene.hotkeyManager = new HotkeyManager(scene, dialogBox, folderPicker, jukeboxUI, retroTvUI);
@@ -97,6 +101,8 @@ game.events.on('ready', () => {
   dialogBox.onClose = () => { scene.input.enabled = true; };
   jukeboxUI.onShow = () => { scene.input.enabled = false; };
   jukeboxUI.onHide = () => { scene.input.enabled = true; };
+  themeSettingsUI.onShow = () => { scene.input.enabled = false; };
+  themeSettingsUI.onHide = () => { scene.input.enabled = true; };
   // ─── Retro TV Mini Player (synced YouTube on bar scene TV sprite) ───
   const miniTv = document.getElementById('retro-tv-mini');
 
