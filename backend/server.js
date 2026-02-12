@@ -759,7 +759,7 @@ async function readClaudeConfig(workDir) {
 // ─── Section 8: WebSocket Server ─────────────────────────────────────────────
 
 function createWSS(server, sessionManager, fileWatcher) {
-  const wss = new WebSocketServer({ server, path: '/ws' });
+  const wss = new WebSocketServer({ server, path: '/ws', maxPayload: 8 * 1024 * 1024 });
 
   // --- Helpers ---
 
@@ -1039,6 +1039,79 @@ function createWSS(server, sessionManager, fileWatcher) {
               sendToClient(ws, 'file.saved', { sessionId, filePath });
             } catch (err) {
               sendToClient(ws, 'error', { message: `Cannot write file: ${err.message}`, code: 'INVALID_MESSAGE' });
+            }
+            break;
+          }
+
+          case 'file.upload': {
+            const { sessionId, filePath, content, encoding } = msg.payload;
+            if (!sessionId || !filePath || content === undefined) {
+              sendToClient(ws, 'error', { message: 'sessionId, filePath, and content are required', code: 'INVALID_MESSAGE' });
+              return;
+            }
+            const uploadSession = sessionManager.get(sessionId);
+            if (!uploadSession) {
+              sendToClient(ws, 'error', { message: 'Session not found', code: 'SESSION_NOT_FOUND' });
+              return;
+            }
+            const uploadAbsPath = path.resolve(uploadSession.workDir, filePath);
+            if (!uploadAbsPath.startsWith(uploadSession.workDir)) {
+              sendToClient(ws, 'error', { message: 'Path traversal not allowed', code: 'INVALID_MESSAGE' });
+              return;
+            }
+            try {
+              let buf;
+              if (encoding === 'base64') {
+                buf = Buffer.from(content, 'base64');
+              } else {
+                buf = Buffer.from(content, 'utf-8');
+              }
+              // 5MB decoded size limit
+              if (buf.length > 5 * 1024 * 1024) {
+                sendToClient(ws, 'error', { message: 'File too large (max 5MB decoded)', code: 'INVALID_MESSAGE' });
+                return;
+              }
+              // Ensure parent directory exists
+              await fs.promises.mkdir(path.dirname(uploadAbsPath), { recursive: true });
+              await fs.promises.writeFile(uploadAbsPath, buf);
+              sendToClient(ws, 'file.uploaded', { sessionId, filePath });
+            } catch (err) {
+              sendToClient(ws, 'error', { message: `Upload failed: ${err.message}`, code: 'INVALID_MESSAGE' });
+            }
+            break;
+          }
+
+          case 'file.download': {
+            const { sessionId, filePath } = msg.payload;
+            if (!sessionId || !filePath) {
+              sendToClient(ws, 'error', { message: 'sessionId and filePath are required', code: 'INVALID_MESSAGE' });
+              return;
+            }
+            const dlSession = sessionManager.get(sessionId);
+            if (!dlSession) {
+              sendToClient(ws, 'error', { message: 'Session not found', code: 'SESSION_NOT_FOUND' });
+              return;
+            }
+            const dlAbsPath = path.resolve(dlSession.workDir, filePath);
+            if (!dlAbsPath.startsWith(dlSession.workDir)) {
+              sendToClient(ws, 'error', { message: 'Path traversal not allowed', code: 'INVALID_MESSAGE' });
+              return;
+            }
+            try {
+              const stat = await fs.promises.stat(dlAbsPath);
+              if (stat.size > 5 * 1024 * 1024) {
+                sendToClient(ws, 'error', { message: 'File too large (max 5MB)', code: 'INVALID_MESSAGE' });
+                return;
+              }
+              const buf = await fs.promises.readFile(dlAbsPath);
+              sendToClient(ws, 'file.downloadReady', {
+                sessionId,
+                filePath,
+                content: buf.toString('base64'),
+                size: stat.size,
+              });
+            } catch (err) {
+              sendToClient(ws, 'error', { message: `Download failed: ${err.message}`, code: 'INVALID_MESSAGE' });
             }
             break;
           }

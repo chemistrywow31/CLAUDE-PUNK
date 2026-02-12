@@ -11,6 +11,7 @@
 import * as monaco from 'monaco-editor';
 import { marked } from 'marked';
 import wsService from '../services/websocket.js';
+import { downloadBase64File } from './downloadHelper.js';
 
 // Monaco worker setup via Vite ESM
 import editorWorker from 'monaco-editor/esm/vs/editor/editor.worker?worker';
@@ -199,6 +200,7 @@ export default class FileEditor {
     this.previewContainer = null;
     this.unsubContent = null;
     this.unsubSaved = null;
+    this.unsubDownloadReady = null;
   }
 
   render(container) {
@@ -209,6 +211,7 @@ export default class FileEditor {
       <div class="fe-toolbar">
         <span class="fe-filename">No file selected</span>
         <div class="fe-actions">
+          <button class="fe-download hidden" title="Download file">DOWNLOAD</button>
           <button class="fe-toggle-preview hidden" title="Toggle preview">PREVIEW</button>
           <button class="fe-toggle-edit" title="Toggle edit mode">READ-ONLY</button>
           <button class="fe-save hidden" title="Save file">SAVE</button>
@@ -239,6 +242,13 @@ export default class FileEditor {
       this.save();
     });
 
+    // Download
+    this.el.querySelector('.fe-download').addEventListener('click', () => {
+      if (this.currentFile) {
+        wsService.downloadFile(this.sessionId, this.currentFile);
+      }
+    });
+
     // Listen for file content responses
     this.unsubContent = wsService.on('file.content', (payload) => {
       if (payload.sessionId !== this.sessionId) return;
@@ -252,6 +262,11 @@ export default class FileEditor {
       const saveBtn = this.el.querySelector('.fe-save');
       saveBtn.textContent = 'SAVED';
       setTimeout(() => { saveBtn.textContent = 'SAVE'; }, 1500);
+    });
+
+    this.unsubDownloadReady = wsService.on('file.downloadReady', (payload) => {
+      if (payload.sessionId !== this.sessionId) return;
+      downloadBase64File(payload.filePath, payload.content);
     });
   }
 
@@ -269,6 +284,7 @@ export default class FileEditor {
       this.el.querySelector('.fe-toggle-edit').classList.add('hidden');
       this.el.querySelector('.fe-toggle-preview').classList.add('hidden');
       this.el.querySelector('.fe-save').classList.add('hidden');
+      this.el.querySelector('.fe-download').classList.add('hidden');
       this._showEditorMode();
       if (this.editor) { this.editor.setValue(''); }
       return;
@@ -282,6 +298,7 @@ export default class FileEditor {
     const togglePreview = this.el.querySelector('.fe-toggle-preview');
     toggleEdit.textContent = 'READ-ONLY';
     this.el.querySelector('.fe-save').classList.add('hidden');
+    this.el.querySelector('.fe-download').classList.remove('hidden');
 
     // Check file type
     const ext = filePath.split('.').pop().toLowerCase();
@@ -485,6 +502,7 @@ export default class FileEditor {
   destroy() {
     if (this.unsubContent) this.unsubContent();
     if (this.unsubSaved) this.unsubSaved();
+    if (this.unsubDownloadReady) this.unsubDownloadReady();
     if (this.editor) {
       this.editor.dispose();
       this.editor = null;

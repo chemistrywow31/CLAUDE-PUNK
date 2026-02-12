@@ -10,8 +10,8 @@
 
 .files-tab .files-sidebar {
   width: 250px;
-  min-width: 200px;
-  max-width: 300px;
+  min-width: 150px;
+  flex-shrink: 0;
   display: flex;
   flex-direction: column;
   overflow: hidden;
@@ -149,4 +149,135 @@
 .file-node.selected > .file-row .file-label {
   background: #00f0ff1a;
   color: #00f0ff;
+}
+
+/* ─── Upload button ─────────────────────────────────────────── */
+
+.files-upload {
+  background: none;
+  border: 1px solid var(--text-secondary);
+  color: var(--text-secondary);
+  width: 24px;
+  height: 24px;
+  cursor: pointer;
+  font-size: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.files-upload:hover {
+  border-color: var(--border-neon);
+  color: var(--border-neon);
+}
+
+/* ─── Download button on file rows ──────────────────────────── */
+
+.file-download-btn {
+  display: none;
+  background: none;
+  border: none;
+  color: var(--text-secondary);
+  font-size: 13px;
+  cursor: pointer;
+  padding: 0 3px;
+  line-height: 1;
+  flex-shrink: 0;
+}
+
+.file-row:hover .file-download-btn {
+  display: block;
+}
+
+.file-download-btn:hover {
+  color: var(--border-neon);
+}
+
+/* ─── Download button in editor toolbar ─────────────────────── */
+
+.fe-download {
+  background: none;
+  border: 1px solid #4a4a5e;
+  color: #8888aa;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  padding: 2px 8px;
+  cursor: pointer;
+  border-radius: 2px;
+}
+
+.fe-download:hover {
+  border-color: #00f0ff;
+  color: #00f0ff;
+}
+
+/* ─── Upload status bar ─────────────────────────────────────── */
+
+.files-upload-status {
+  padding: 4px 10px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px;
+  color: #00f0ff;
+  border-top: 1px solid #00f0ff22;
+  background: #0a0a14;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* ─── Drag-drop highlight ───────────────────────────────────── */
+
+.files-sidebar.drop-active {
+  border: 2px dashed #00f0ff;
+  background: #00f0ff0a;
+}
+
+/* ─── Resize handle (horizontal) ────────────────────────────── */
+
+.resize-handle-h {
+  width: 5px;
+  cursor: col-resize;
+  flex-shrink: 0;
+  position: relative;
+  background: transparent;
+}
+
+.resize-handle-h::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 2px;
+  width: 1px;
+  background: #00f0ff33;
+}
+
+.resize-handle-h:hover::after,
+.resize-handle-h.active::after {
+  background: #00f0ff;
+}
+
+/* ─── Resize handle (vertical) ──────────────────────────────── */
+
+.resize-handle-v {
+  height: 5px;
+  cursor: row-resize;
+  flex-shrink: 0;
+  position: relative;
+  background: transparent;
+}
+
+.resize-handle-v::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 2px;
+  height: 1px;
+  background: #00f0ff33;
+}
+
+.resize-handle-v:hover::after,
+.resize-handle-v.active::after {
+  background: #00f0ff;
 }

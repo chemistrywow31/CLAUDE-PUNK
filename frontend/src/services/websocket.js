@@ -182,6 +182,14 @@ class WebSocketService {
   deleteFile(sessionId, filePath) {
     return this.send('file.delete', { sessionId, filePath });
   }
+
+  uploadFile(sessionId, filePath, content, encoding = 'utf-8') {
+    return this.send('file.upload', { sessionId, filePath, content, encoding });
+  }
+
+  downloadFile(sessionId, filePath) {
+    return this.send('file.download', { sessionId, filePath });
+  }
 }
 
 // Singleton

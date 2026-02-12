@@ -15,12 +15,13 @@
 
 #dialog-box {
   width: 90vw;
-  max-width: 90vw;
+  max-width: 98vw;
   height: 85vh;
-  max-height: 85vh;
+  max-height: 98vh;
   display: flex;
   flex-direction: column;
   border-radius: 0;
+  position: relative;
 }
 
 /* ─── Header ──────────────────────────────────────────────────── */
@@ -549,4 +550,96 @@
   font-size: 11px;
   padding: 16px;
   text-align: center;
+}
+
+/* ─── Dialog Resize Handles ──────────────────────────────────── */
+
+.dialog-resize-edge,
+.dialog-resize-corner {
+  position: absolute;
+  z-index: 10;
+}
+
+/* Edge handles: 6px hit zone */
+.dialog-resize-top {
+  top: -3px;
+  left: 6px;
+  right: 6px;
+  height: 6px;
+  cursor: ns-resize;
+}
+
+.dialog-resize-bottom {
+  bottom: -3px;
+  left: 6px;
+  right: 6px;
+  height: 6px;
+  cursor: ns-resize;
+}
+
+.dialog-resize-left {
+  left: -3px;
+  top: 6px;
+  bottom: 6px;
+  width: 6px;
+  cursor: ew-resize;
+}
+
+.dialog-resize-right {
+  right: -3px;
+  top: 6px;
+  bottom: 6px;
+  width: 6px;
+  cursor: ew-resize;
+}
+
+/* Corner handles */
+.dialog-resize-top-left {
+  top: -3px;
+  left: -3px;
+  width: 12px;
+  height: 12px;
+  cursor: nwse-resize;
+}
+
+.dialog-resize-top-right {
+  top: -3px;
+  right: -3px;
+  width: 12px;
+  height: 12px;
+  cursor: nesw-resize;
+}
+
+.dialog-resize-bottom-right {
+  bottom: -3px;
+  right: -3px;
+  width: 12px;
+  height: 12px;
+  cursor: nwse-resize;
+}
+
+.dialog-resize-bottom-left {
+  bottom: -3px;
+  left: -3px;
+  width: 12px;
+  height: 12px;
+  cursor: nesw-resize;
+}
+
+/* Neon glow on hover */
+.dialog-resize-edge:hover,
+.dialog-resize-edge.active {
+  background: linear-gradient(to bottom, transparent, #00f0ff22, transparent);
+}
+
+.dialog-resize-left:hover,
+.dialog-resize-left.active,
+.dialog-resize-right:hover,
+.dialog-resize-right.active {
+  background: linear-gradient(to right, transparent, #00f0ff22, transparent);
+}
+
+.dialog-resize-corner:hover,
+.dialog-resize-corner.active {
+  background: radial-gradient(circle at center, #00f0ff33, transparent 70%);
 }

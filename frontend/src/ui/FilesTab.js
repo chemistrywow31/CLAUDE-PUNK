@@ -5,6 +5,8 @@
 
 import wsService from '../services/websocket.js';
 import FileEditor from './FileEditor.js';
+import { createResizeHandle } from './resizeHandle.js';
+import { downloadBase64File } from './downloadHelper.js';
 
 export default class FilesTab {
   constructor(sessionId) {
@@ -17,6 +19,8 @@ export default class FilesTab {
     this.unsubTree = null;
     this.unsubCreated = null;
     this.unsubDeleted = null;
+    this.unsubUploaded = null;
+    this.unsubDownloadReady = null;
     this.fileEditor = null;
     this.selectedNode = null;
     this.treeData = null;
@@ -33,14 +37,41 @@ export default class FilesTab {
       <div class="files-header">
         <span class="files-count">${this.fileCount} files \u2192 ${this.drinkCount} drinks</span>
         <div class="files-header-actions">
+          <button class="files-upload" title="Upload files">\u2191</button>
           <button class="files-new-file" title="New File">+</button>
           <button class="files-new-dir" title="New Folder">+\u25a1</button>
           <button class="files-refresh" title="Refresh">\u21bb</button>
         </div>
       </div>
       <div class="files-tree"></div>
+      <div class="files-upload-status hidden"></div>
     `;
     this.el.appendChild(sidebar);
+
+    // Hidden file input for upload
+    this._fileInput = document.createElement('input');
+    this._fileInput.type = 'file';
+    this._fileInput.multiple = true;
+    this._fileInput.style.display = 'none';
+    this.el.appendChild(this._fileInput);
+
+    this._fileInput.addEventListener('change', () => {
+      if (this._fileInput.files.length > 0) {
+        this._handleFiles(this._fileInput.files);
+        this._fileInput.value = '';
+      }
+    });
+
+    // Resize handle between sidebar and editor
+    const resizeHandle = createResizeHandle({
+      direction: 'horizontal',
+      target: sidebar,
+      property: 'width',
+      min: 150,
+      max: 500,
+      storageKey: 'claudePunk_filesSidebarWidth',
+    });
+    this.el.appendChild(resizeHandle);
 
     // Right editor pane
     this.fileEditor = new FileEditor(this.sessionId);
@@ -59,6 +90,29 @@ export default class FilesTab {
 
     sidebar.querySelector('.files-new-dir').addEventListener('click', () => {
       this.showCreateInput(true);
+    });
+
+    // Upload button
+    sidebar.querySelector('.files-upload').addEventListener('click', () => {
+      this._fileInput.click();
+    });
+
+    // Drag-and-drop on sidebar
+    sidebar.addEventListener('dragover', (e) => {
+      e.preventDefault();
+      sidebar.classList.add('drop-active');
+    });
+    sidebar.addEventListener('dragleave', (e) => {
+      if (!sidebar.contains(e.relatedTarget)) {
+        sidebar.classList.remove('drop-active');
+      }
+    });
+    sidebar.addEventListener('drop', (e) => {
+      e.preventDefault();
+      sidebar.classList.remove('drop-active');
+      if (e.dataTransfer.files.length > 0) {
+        this._handleFiles(e.dataTransfer.files);
+      }
     });
 
     // Listen for tree response
@@ -98,6 +152,19 @@ export default class FilesTab {
         this.fileEditor.openFile(null);
       }
       this.requestTree();
+    });
+
+    // Upload confirmation
+    this.unsubUploaded = wsService.on('file.uploaded', (payload) => {
+      if (payload.sessionId !== this.sessionId) return;
+      this._showUploadStatus(`Uploaded ${payload.filePath}`, false);
+      this.requestTree();
+    });
+
+    // Download ready
+    this.unsubDownloadReady = wsService.on('file.downloadReady', (payload) => {
+      if (payload.sessionId !== this.sessionId) return;
+      downloadBase64File(payload.filePath, payload.content);
     });
 
     // Request tree on render
@@ -176,6 +243,20 @@ export default class FilesTab {
       }
 
       row.appendChild(label);
+
+      // Download button (files only, visible on hover)
+      if (!node.isDir) {
+        const dlBtn = document.createElement('button');
+        dlBtn.className = 'file-download-btn';
+        dlBtn.title = `Download ${node.name}`;
+        dlBtn.textContent = '\u2193';
+        dlBtn.addEventListener('click', (e) => {
+          e.stopPropagation();
+          wsService.downloadFile(this.sessionId, node.path);
+        });
+        row.appendChild(dlBtn);
+      }
+
       row.appendChild(delBtn);
       li.appendChild(row);
 
@@ -269,6 +350,59 @@ export default class FilesTab {
     this.el.appendChild(overlay);
   }
 
+  /** Handle file uploads from input or drag-drop */
+  _handleFiles(fileList) {
+    const BINARY_EXTS = new Set([
+      'png', 'jpg', 'jpeg', 'gif', 'webp', 'ico', 'bmp', 'svg',
+      'pdf', 'zip', 'gz', 'tar', 'woff', 'woff2', 'ttf', 'otf',
+      'mp3', 'wav', 'ogg', 'mp4', 'webm', 'mov',
+    ]);
+
+    for (const file of fileList) {
+      const ext = file.name.split('.').pop().toLowerCase();
+      const isBinary = BINARY_EXTS.has(ext);
+
+      this._showUploadStatus(`Uploading ${file.name}...`, false);
+
+      const reader = new FileReader();
+      reader.onload = () => {
+        let content, encoding;
+        if (isBinary) {
+          // readAsDataURL returns "data:mime;base64,XXXXX" — strip prefix
+          const dataUrl = reader.result;
+          content = dataUrl.split(',')[1];
+          encoding = 'base64';
+        } else {
+          content = reader.result;
+          encoding = 'utf-8';
+        }
+        wsService.uploadFile(this.sessionId, file.name, content, encoding);
+      };
+      reader.onerror = () => {
+        this._showUploadStatus(`Failed to read ${file.name}`, true);
+      };
+
+      if (isBinary) {
+        reader.readAsDataURL(file);
+      } else {
+        reader.readAsText(file);
+      }
+    }
+  }
+
+  /** Show upload status bar at bottom of sidebar */
+  _showUploadStatus(message, isError) {
+    const statusEl = this.el?.querySelector('.files-upload-status');
+    if (!statusEl) return;
+    statusEl.textContent = message;
+    statusEl.classList.remove('hidden');
+    statusEl.style.color = isError ? '#ff0080' : '#00f0ff';
+    clearTimeout(this._uploadStatusTimer);
+    this._uploadStatusTimer = setTimeout(() => {
+      statusEl.classList.add('hidden');
+    }, 3000);
+  }
+
   formatSize(bytes) {
     if (bytes < 1024) return `${bytes}B`;
     if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)}K`;
@@ -280,6 +414,9 @@ export default class FilesTab {
     if (this.unsubFiles) this.unsubFiles();
     if (this.unsubCreated) this.unsubCreated();
     if (this.unsubDeleted) this.unsubDeleted();
+    if (this.unsubUploaded) this.unsubUploaded();
+    if (this.unsubDownloadReady) this.unsubDownloadReady();
+    if (this._uploadStatusTimer) clearTimeout(this._uploadStatusTimer);
     if (this.fileEditor) this.fileEditor.destroy();
     if (this.el && this.el.parentNode) {
       this.el.parentNode.removeChild(this.el);

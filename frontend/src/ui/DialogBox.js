@@ -9,6 +9,7 @@ import costTracker from '../services/costTracker.js';
 import TerminalTab from './TerminalTab.js';
 import FilesTab from './FilesTab.js';
 import ClaudeConfigTab from './ClaudeConfigTab.js';
+import { createDialogResizeHandles } from './resizeHandle.js';
 
 export default class DialogBox {
   constructor() {
@@ -45,6 +46,17 @@ export default class DialogBox {
         </div>
       </div>
     `;
+
+    // Dialog resize handles (8 edges + corners)
+    const dialogBox = this.overlay.querySelector('#dialog-box');
+    createDialogResizeHandles(dialogBox, {
+      minWidth: 400,
+      minHeight: 300,
+      maxWidth: Math.round(window.innerWidth * 0.98),
+      maxHeight: Math.round(window.innerHeight * 0.98),
+      widthKey: 'claudePunk_dialogWidth',
+      heightKey: 'claudePunk_dialogHeight',
+    });
 
     // Close
     this.overlay.querySelector('#dialog-close').addEventListener('click', () => this.close());

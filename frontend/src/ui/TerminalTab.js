@@ -10,6 +10,7 @@ import { Terminal } from '@xterm/xterm';
 import { FitAddon } from '@xterm/addon-fit';
 import wsService from '../services/websocket.js';
 import FileWarpPanel from './FileWarpPanel.js';
+import { createResizeHandle } from './resizeHandle.js';
 
 /** sessionId → TerminalTab  (survives dialog close / reopen) */
 const cache = new Map();
@@ -157,6 +158,18 @@ export default class TerminalTab {
       this.term?.focus();
     });
     this.fileWarpPanel.render(this.wrapper);
+
+    // Resize handle between sidebar and terminal
+    const fwpEl = this.fileWarpPanel.el;
+    const resizeHandle = createResizeHandle({
+      direction: 'horizontal',
+      target: fwpEl,
+      property: 'width',
+      min: 150,
+      max: 500,
+      storageKey: 'claudePunk_fileWarpWidth',
+    });
+    this.wrapper.appendChild(resizeHandle);
 
     // Terminal container
     this.el = document.createElement('div');

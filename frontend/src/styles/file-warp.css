@@ -2,8 +2,8 @@
 
 .file-warp-panel {
   width: 250px;
-  min-width: 200px;
-  max-width: 300px;
+  min-width: 150px;
+  flex-shrink: 0;
   height: 100%;
   background: #1a1a2e;
   border-right: 1px solid #00f0ff33;
