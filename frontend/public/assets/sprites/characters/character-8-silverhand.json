@@ -1,0 +1,44 @@
+{
+  "frames": {
+    "char-idle-8": {
+      "frame": {
+        "x": 0,
+        "y": 0,
+        "w": 96,
+        "h": 192
+      }
+    },
+    "char-drink-8": {
+      "frame": {
+        "x": 96,
+        "y": 0,
+        "w": 96,
+        "h": 192
+      }
+    },
+    "char-lean-8": {
+      "frame": {
+        "x": 192,
+        "y": 0,
+        "w": 96,
+        "h": 192
+      }
+    },
+    "char-look-8": {
+      "frame": {
+        "x": 288,
+        "y": 0,
+        "w": 96,
+        "h": 192
+      }
+    }
+  },
+  "meta": {
+    "image": "character-8-silverhand.png",
+    "size": {
+      "w": 384,
+      "h": 192
+    },
+    "scale": 1
+  }
+}
