@@ -18,6 +18,7 @@ import { NEON_FLICKER_MIN, NEON_FLICKER_MAX } from '../config/animations.js';
 import Character from '../entities/Character.js';
 import DrinkManager from '../entities/DrinkManager.js';
 import CostDisplay from '../entities/CostDisplay.js';
+import ContextGauge from '../entities/ContextGauge.js';
 import CostDashboard from '../entities/CostDashboard.js';
 import Bartender from '../entities/Bartender.js';
 import TerminalTab from '../ui/TerminalTab.js';
@@ -25,6 +26,7 @@ import wsService from '../services/websocket.js';
 import jukeboxAudio from '../services/jukeboxAudio.js';
 import retroTvPlayer from '../services/retroTvPlayer.js';
 import costTracker from '../services/costTracker.js';
+import contextTracker from '../services/contextTracker.js';
 
 export default class BarScene extends Phaser.Scene {
   constructor() {
@@ -1545,9 +1547,22 @@ export default class BarScene extends Phaser.Scene {
     this._replaySessionIds = null;
     this._replayTimer = null;
 
+    // Feed all claude.activity events to contextTracker for per-character gauges
+    wsService.on('claude.activity', (payload) => {
+      if (!payload.events || !Array.isArray(payload.events)) return;
+      for (const event of payload.events) {
+        contextTracker.onEvent(payload.gameSessionId, event);
+      }
+    });
+
     wsService.on('connection.open', () => {
       this.connectionText.setText('● ONLINE');
       this.connectionText.setColor('#00f0ff');
+
+      // Re-watch activity for all existing patrons (resume support)
+      for (const sessionId of this.patrons.keys()) {
+        wsService.watchActivity(sessionId);
+      }
 
       // Start replay reconciliation: track which sessions the backend tells us about.
       // After the replay window closes, remove patrons for sessions that no longer exist.
@@ -1659,11 +1674,13 @@ export default class BarScene extends Phaser.Scene {
       this.hotkeyManager.free(sessionId);
     }
 
-    // Remove character and cost display
+    // Remove character, cost display, and context gauge
     patron.character.exit();
     patron.drinkManager.destroy();
     if (patron.costDisplay) patron.costDisplay.destroy();
+    if (patron.contextGauge) patron.contextGauge.destroy();
     costTracker.removeSession(sessionId);
+    contextTracker.removeSession(sessionId);
 
     // Free seat
     this.occupiedSeats.delete(patron.seat.id);
@@ -1719,7 +1736,13 @@ export default class BarScene extends Phaser.Scene {
     costTracker.initSession(sessionId, agentType);
     const costDisplay = new CostDisplay(this, sessionId, seat.drinkAnchor);
 
-    this.patrons.set(sessionId, { character, drinkManager, costDisplay, seat });
+    // Context gauge above character name
+    const contextGauge = new ContextGauge(this, sessionId, character.nameText);
+
+    // Watch activity stream (triggers backfill for resume support)
+    wsService.watchActivity(sessionId);
+
+    this.patrons.set(sessionId, { character, drinkManager, costDisplay, contextGauge, seat });
 
     // If music is already playing, queue music note for this character
     if (this._musicWasPlaying) {

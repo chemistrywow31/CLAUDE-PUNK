@@ -17,6 +17,7 @@ import path from 'node:path';
 import { EventEmitter } from 'node:events';
 import { execSync } from 'node:child_process';
 import http from 'node:http';
+import os from 'node:os';
 
 // ─── Section 1: Config ───────────────────────────────────────────────────────
 
@@ -158,6 +159,16 @@ function shouldExclude(name) {
   // Exclude hidden files/dirs except .claude
   if (name.startsWith('.') && name !== '.claude') return true;
   return false;
+}
+
+// ─── Claude Activity Helpers ────────────────────────────────────────────────
+
+function encodeProjectPath(workDir) {
+  return workDir.replace(/\//g, '-');
+}
+
+function getClaudeProjectDir(workDir) {
+  return path.join(os.homedir(), '.claude', 'projects', encodeProjectPath(workDir));
 }
 
 // ─── Section 2: RingBuffer ───────────────────────────────────────────────────
@@ -666,6 +677,507 @@ class FileWatcher extends EventEmitter {
   }
 }
 
+// ─── Section 5b: ClaudeActivityWatcher ───────────────────────────────────────
+
+class ClaudeActivityWatcher extends EventEmitter {
+  constructor() {
+    super();
+    // Deduplicated: one chokidar watcher per projectDir
+    this.dirWatchers = new Map();  // projectDir → { watcher, fileStates, gameSessionIds: Set, fileOwners: Map<filePath, gameSessionId> }
+    // Reverse lookup: gameSessionId → projectDir
+    this.sessionDirs = new Map();
+    this.debounceTimers = new Map(); // filePath → timer
+  }
+
+  watch(gameSessionId, workDir) {
+    if (this.sessionDirs.has(gameSessionId)) return;
+
+    const projectDir = getClaudeProjectDir(workDir);
+
+    // Check if directory exists
+    try {
+      fs.accessSync(projectDir);
+    } catch {
+      console.log(`[ClaudeActivity] Project dir not found (yet): ${projectDir}`);
+      return;
+    }
+
+    this.sessionDirs.set(gameSessionId, projectDir);
+
+    // If this projectDir is already watched, just add this session
+    if (this.dirWatchers.has(projectDir)) {
+      const entry = this.dirWatchers.get(projectDir);
+      entry.gameSessionIds.add(gameSessionId);
+      console.log(`[ClaudeActivity] Added session ${gameSessionId} to existing watcher for ${projectDir}`);
+      return;
+    }
+
+    console.log(`[ClaudeActivity] Watching ${projectDir} for session ${gameSessionId}`);
+
+    const fileStates = new Map();   // filePath → { byteOffset, claudeSessionId }
+    const fileOwners = new Map();   // filePath → gameSessionId (which session owns this JSONL)
+    const gameSessionIds = new Set([gameSessionId]);
+
+    const watcher = chokidar.watch(path.join(projectDir, '*.jsonl'), {
+      persistent: true,
+      ignoreInitial: false,
+      depth: 0,
+    });
+
+    const watcherReady = { value: false };
+    watcher.on('ready', () => { watcherReady.value = true; });
+
+    watcher.on('add', (filePath) => {
+      try {
+        const stat = fs.statSync(filePath);
+        const claudeSessionId = path.basename(filePath, '.jsonl');
+        fileStates.set(filePath, { byteOffset: stat.size, claudeSessionId });
+
+        if (!watcherReady.value) {
+          // Existing file discovered during initial scan — track but don't assign
+          console.log(`[ClaudeActivity] Tracking existing file: ${path.basename(filePath)} (${stat.size} bytes, unassigned)`);
+          return;
+        }
+
+        // Truly new file created after watcher started — assign to most recent unassigned session
+        console.log(`[ClaudeActivity] New file detected: ${path.basename(filePath)} (${stat.size} bytes)`);
+        const ownedFiles = new Set(fileOwners.values());
+        for (const sid of [...gameSessionIds].reverse()) {
+          if (!ownedFiles.has(sid)) {
+            fileOwners.set(filePath, sid);
+            console.log(`[ClaudeActivity] Assigned ${path.basename(filePath)} → session ${sid}`);
+            break;
+          }
+        }
+      } catch {
+        // file may have been removed already
+      }
+    });
+
+    watcher.on('change', (filePath) => {
+      if (!filePath.endsWith('.jsonl')) return;
+
+      // Debounce reads per file (single read, then emit to owner)
+      const existing = this.debounceTimers.get(filePath);
+      if (existing) clearTimeout(existing);
+      this.debounceTimers.set(filePath, setTimeout(() => {
+        this.debounceTimers.delete(filePath);
+        this._readNewLines(filePath, projectDir);
+      }, 200));
+    });
+
+    this.dirWatchers.set(projectDir, { watcher, fileStates, gameSessionIds, fileOwners });
+  }
+
+  _readNewLines(filePath, projectDir) {
+    const dirEntry = this.dirWatchers.get(projectDir);
+    if (!dirEntry) return;
+
+    const state = dirEntry.fileStates.get(filePath);
+    if (!state) return;
+
+    let stat;
+    try {
+      stat = fs.statSync(filePath);
+    } catch {
+      return;
+    }
+
+    if (stat.size <= state.byteOffset) return;
+
+    const bytesToRead = stat.size - state.byteOffset;
+    const buf = Buffer.alloc(bytesToRead);
+
+    let fd;
+    try {
+      fd = fs.openSync(filePath, 'r');
+      fs.readSync(fd, buf, 0, bytesToRead, state.byteOffset);
+      fs.closeSync(fd);
+    } catch {
+      if (fd !== undefined) try { fs.closeSync(fd); } catch { /* ignore */ }
+      return;
+    }
+
+    state.byteOffset = stat.size;
+
+    const lines = buf.toString('utf-8').split('\n').filter(Boolean);
+    const events = [];
+
+    for (const line of lines) {
+      try {
+        const entry = JSON.parse(line);
+        const parsed = this._parseEntry(entry);
+        if (parsed.length > 0) events.push(...parsed);
+      } catch {
+        // skip malformed lines
+      }
+    }
+
+    if (events.length === 0) return;
+
+    // Determine which session owns this file
+    const owner = dirEntry.fileOwners.get(filePath);
+    if (owner) {
+      // Emit only to the owning session
+      this.emit('activity', { gameSessionId: owner, events });
+    } else {
+      // Unassigned file: try to assign now
+      const ownedFiles = new Set(dirEntry.fileOwners.values());
+      for (const sid of [...dirEntry.gameSessionIds].reverse()) {
+        if (!ownedFiles.has(sid)) {
+          dirEntry.fileOwners.set(filePath, sid);
+          console.log(`[ClaudeActivity] Late-assigned ${path.basename(filePath)} → session ${sid}`);
+          this.emit('activity', { gameSessionId: sid, events });
+          return;
+        }
+      }
+      // All sessions have files — drop events rather than broadcast to wrong sessions
+      console.log(`[ClaudeActivity] Dropping events from unassigned file ${path.basename(filePath)} (all sessions already have files)`);
+    }
+  }
+
+  _parseEntry(entry) {
+    const results = [];
+    const ts = entry.timestamp || new Date().toISOString();
+
+    switch (entry.type) {
+      case 'assistant': {
+        const msg = entry.message;
+        if (!msg || !msg.content) break;
+
+        // Extract usage info
+        const usage = msg.usage ? {
+          inputTokens: msg.usage.input_tokens,
+          outputTokens: msg.usage.output_tokens,
+          cacheRead: msg.usage.cache_read_input_tokens,
+          cacheCreation: msg.usage.cache_creation_input_tokens,
+        } : undefined;
+
+        for (const block of msg.content) {
+          if (block.type === 'text' && block.text) {
+            results.push({
+              timestamp: ts,
+              kind: 'assistant_text',
+              text: block.text.slice(0, 500),
+              usage,
+            });
+          } else if (block.type === 'tool_use') {
+            const toolEvent = {
+              timestamp: ts,
+              kind: 'tool_use',
+              toolName: block.name,
+              toolId: block.id,
+              input: this._summarizeToolInput(block.name, block.input),
+            };
+            // Tool-specific extra fields
+            switch (block.name) {
+              case 'ExitPlanMode':
+                toolEvent.plan = (block.input?.plan || JSON.stringify(block.input || {})).slice(0, 20000);
+                break;
+              case 'AskUserQuestion':
+                toolEvent.questions = block.input?.questions;
+                break;
+              case 'Task':
+                toolEvent.subagentType = block.input?.subagent_type;
+                toolEvent.agentName = block.input?.name;
+                toolEvent.description = block.input?.description;
+                break;
+              case 'Skill':
+                toolEvent.skill = block.input?.skill;
+                toolEvent.args = block.input?.args;
+                break;
+              case 'TeamCreate':
+                toolEvent.teamName = block.input?.team_name;
+                toolEvent.teamDescription = block.input?.description;
+                break;
+              case 'SendMessage':
+                toolEvent.recipient = block.input?.recipient;
+                toolEvent.messageType = block.input?.type;
+                break;
+              case 'TaskCreate':
+                toolEvent.taskSubject = block.input?.subject;
+                toolEvent.taskDescription = (block.input?.description || '').slice(0, 500);
+                toolEvent.taskActiveForm = block.input?.activeForm;
+                break;
+              case 'TaskUpdate':
+                toolEvent.taskId = block.input?.taskId;
+                toolEvent.taskStatus = block.input?.status;
+                toolEvent.taskSubject = block.input?.subject;
+                toolEvent.taskOwner = block.input?.owner;
+                break;
+            }
+            results.push(toolEvent);
+          } else if (block.type === 'thinking' && block.thinking) {
+            results.push({
+              timestamp: ts,
+              kind: 'thinking',
+              text: block.thinking.slice(0, 10000),
+            });
+          }
+        }
+
+        // If there's usage but no text/tool blocks emitted yet, emit a standalone usage event
+        if (usage && results.length === 0) {
+          results.push({ timestamp: ts, kind: 'assistant_text', text: '', usage });
+        }
+        break;
+      }
+
+      case 'progress': {
+        const data = entry.data;
+        if (!data) break;
+
+        // Skip hook events entirely
+        if (data.type === 'hook_progress') break;
+
+        if (data.type === 'agent_progress' && data.content) {
+          // Sub-agent progress — extract tool_use blocks
+          const content = Array.isArray(data.content) ? data.content : [];
+          let hasToolUse = false;
+          for (const block of content) {
+            if (block.type === 'tool_use') {
+              hasToolUse = true;
+              results.push({
+                timestamp: ts,
+                kind: 'subagent_tool_use',
+                slug: data.slug,
+                toolName: block.name,
+                toolId: block.id,
+                input: this._summarizeToolInput(block.name, block.input),
+              });
+            }
+          }
+          // If no tool_use blocks found, emit standalone agent_progress
+          if (!hasToolUse) {
+            results.push({
+              timestamp: ts,
+              kind: 'agent_progress',
+              agentId: data.slug || data.agentId,
+              prompt: (data.prompt || '').slice(0, 200),
+            });
+          }
+        }
+        break;
+      }
+
+      case 'user': {
+        const msg = entry.message;
+        if (!msg || !msg.content) break;
+        let text = '';
+        if (typeof msg.content === 'string') {
+          text = msg.content.slice(0, 200);
+        } else if (Array.isArray(msg.content)) {
+          const textBlock = msg.content.find(b => b.type === 'text');
+          if (textBlock) text = textBlock.text?.slice(0, 200) || '';
+        }
+        if (text) {
+          results.push({ timestamp: ts, kind: 'user_message', text });
+        }
+        break;
+      }
+
+      case 'system': {
+        if (entry.subtype === 'api_error') {
+          results.push({
+            timestamp: ts,
+            kind: 'error',
+            error: entry.error || entry.message || 'API error',
+            retryAttempt: entry.retryAttempt,
+          });
+        }
+        break;
+      }
+      // skip: 'result', 'file-history-snapshot', etc.
+    }
+
+    return results;
+  }
+
+  _summarizeToolInput(toolName, input) {
+    if (!input) return '';
+    switch (toolName) {
+      case 'Read':
+      case 'Write':
+      case 'Edit':
+        return input.file_path || input.path || '';
+      case 'Glob':
+        return input.pattern || '';
+      case 'Bash':
+        return (input.command || '').slice(0, 120);
+      case 'Grep':
+        return `"${input.pattern || ''}" in ${input.path || '.'}`;
+      case 'Task':
+        return `[${input.subagent_type || ''}] ${(input.description || '').slice(0, 100)}`;
+      case 'ExitPlanMode':
+        return 'Plan submitted';
+      case 'EnterPlanMode':
+        return 'Entering plan mode';
+      case 'AskUserQuestion':
+        return (input.questions?.[0]?.question || '').slice(0, 120);
+      case 'Skill':
+        return input.skill || '';
+      case 'TeamCreate':
+        return input.team_name || '';
+      case 'SendMessage':
+        return `→ ${input.recipient || ''}: ${(input.content || '').slice(0, 80)}`;
+      case 'TaskCreate':
+        return input.subject || '';
+      case 'TaskUpdate':
+        return `#${input.taskId || ''} → ${input.status || input.subject || ''}`;
+      case 'TaskList':
+        return 'List tasks';
+      case 'TaskGet':
+        return `#${input.taskId || ''}`;
+      case 'WebSearch':
+        return input.query || '';
+      case 'WebFetch':
+        return input.url || '';
+      default:
+        return JSON.stringify(input).slice(0, 100);
+    }
+  }
+
+  unwatch(gameSessionId) {
+    const projectDir = this.sessionDirs.get(gameSessionId);
+    if (!projectDir) return;
+    this.sessionDirs.delete(gameSessionId);
+
+    const dirEntry = this.dirWatchers.get(projectDir);
+    if (!dirEntry) return;
+
+    dirEntry.gameSessionIds.delete(gameSessionId);
+
+    // Remove file ownership for this session
+    for (const [filePath, owner] of dirEntry.fileOwners) {
+      if (owner === gameSessionId) {
+        dirEntry.fileOwners.delete(filePath);
+      }
+    }
+
+    console.log(`[ClaudeActivity] Unwatching session ${gameSessionId} (${dirEntry.gameSessionIds.size} remaining)`);
+
+    // If no sessions left watching this dir, close the watcher entirely
+    if (dirEntry.gameSessionIds.size === 0) {
+      dirEntry.watcher.close();
+      this.dirWatchers.delete(projectDir);
+
+      // Clean up debounce timers for files in this dir
+      for (const [filePath, timer] of this.debounceTimers) {
+        if (filePath.startsWith(projectDir)) {
+          clearTimeout(timer);
+          this.debounceTimers.delete(filePath);
+        }
+      }
+    }
+  }
+
+  /**
+   * Read the most recent `count` parsed activity events from JSONL files.
+   * Used to backfill the Activity panel on initial subscribe.
+   * If gameSessionId is provided, only reads from the file owned by that session.
+   */
+  async getRecentEvents(workDir, count = 50, afterTimestamp = 0, gameSessionId = null) {
+    const projectDir = getClaudeProjectDir(workDir);
+
+    let fileNames;
+    try {
+      const entries = await fs.promises.readdir(projectDir);
+      fileNames = entries.filter(f => f.endsWith('.jsonl'));
+    } catch {
+      return [];
+    }
+    if (fileNames.length === 0) return [];
+
+    // If we have a file-owner mapping for this session, prefer that specific file
+    let targetFile = null;
+    if (gameSessionId) {
+      const dirEntry = this.dirWatchers.get(projectDir);
+      if (dirEntry) {
+        for (const [fp, owner] of dirEntry.fileOwners) {
+          if (owner === gameSessionId) {
+            targetFile = fp;
+            break;
+          }
+        }
+      }
+    }
+
+    if (!targetFile) {
+      // Fallback: find the most recently modified JSONL file after session creation
+      // BUT skip files already owned by other sessions to prevent cross-session leakage
+      const dirEntry = this.dirWatchers.get(projectDir);
+      const ownedFiles = dirEntry ? new Set(dirEntry.fileOwners.values()) : new Set();
+      const ownedPaths = dirEntry ? new Set(dirEntry.fileOwners.keys()) : new Set();
+
+      let latest = null;
+      for (const f of fileNames) {
+        const fullPath = path.join(projectDir, f);
+        // Skip files already assigned to a different session
+        if (ownedPaths.has(fullPath) && dirEntry?.fileOwners.get(fullPath) !== gameSessionId) continue;
+        try {
+          const stat = await fs.promises.stat(fullPath);
+          if (afterTimestamp && stat.mtimeMs < afterTimestamp) continue;
+          if (!latest || stat.mtimeMs > latest.mtime) {
+            latest = { name: f, mtime: stat.mtimeMs, size: stat.size, fullPath };
+          }
+        } catch { /* skip */ }
+      }
+      if (!latest || latest.size === 0) return [];
+      targetFile = latest.fullPath;
+    }
+
+    let stat;
+    try {
+      stat = fs.statSync(targetFile);
+    } catch {
+      return [];
+    }
+    if (stat.size === 0) return [];
+
+    console.log(`[ClaudeActivity] Reading recent events from ${path.basename(targetFile)} for session ${gameSessionId || '(any)'} (${stat.size} bytes)`);
+
+    // Read last 200KB — more than enough for 50+ events
+    const readSize = Math.min(stat.size, 200 * 1024);
+    const startOffset = stat.size - readSize;
+
+    const buf = Buffer.alloc(readSize);
+    let fd;
+    try {
+      fd = fs.openSync(targetFile, 'r');
+      fs.readSync(fd, buf, 0, readSize, startOffset);
+      fs.closeSync(fd);
+    } catch {
+      if (fd !== undefined) try { fs.closeSync(fd); } catch { /* ignore */ }
+      return [];
+    }
+
+    const text = buf.toString('utf-8');
+    const lines = text.split('\n').filter(Boolean);
+
+    // If we started mid-file, first line might be partial — skip it
+    const startIdx = startOffset > 0 ? 1 : 0;
+
+    // Parse from end to collect most recent first
+    const events = [];
+    for (let i = lines.length - 1; i >= startIdx; i--) {
+      if (events.length >= count) break;
+      try {
+        const entry = JSON.parse(lines[i]);
+        const parsed = this._parseEntry(entry);
+        if (parsed.length > 0) events.unshift(...parsed);
+      } catch { /* skip malformed */ }
+    }
+
+    return events.slice(-count);
+  }
+
+  unwatchAll() {
+    for (const id of [...this.sessionDirs.keys()]) {
+      this.unwatch(id);
+    }
+  }
+}
+
 // ─── Section 6: buildFileTree ────────────────────────────────────────────────
 
 async function buildFileTree(dir, currentDepth = 0, baseDir = null) {
@@ -877,6 +1389,7 @@ function createWSS(server, sessionManager, fileWatcher) {
             const session = sessionManager.create(workDir, label, agentType);
             broadcast('session.update', session);
             fileWatcher.watch(session.id, workDir);
+            activityWatcher.watch(session.id, workDir);
             break;
           }
 
@@ -918,6 +1431,7 @@ function createWSS(server, sessionManager, fileWatcher) {
             }
             sessionManager.kill(sessionId);
             fileWatcher.unwatch(sessionId);
+            activityWatcher.unwatch(sessionId);
             break;
           }
 
@@ -1187,6 +1701,39 @@ function createWSS(server, sessionManager, fileWatcher) {
             break;
           }
 
+          case 'claude.watchActivity': {
+            const { sessionId } = msg.payload;
+            if (!sessionId) {
+              sendToClient(ws, 'error', { message: 'sessionId is required', code: 'INVALID_MESSAGE' });
+              return;
+            }
+            const watchSession = sessionManager.get(sessionId);
+            if (!watchSession) {
+              sendToClient(ws, 'error', { message: 'Session not found', code: 'SESSION_NOT_FOUND' });
+              return;
+            }
+            activityWatcher.watch(sessionId, watchSession.workDir);
+
+            // Backfill: send recent events, but only from files modified after this
+            // session was created — prevents showing events from old conversations
+            const sessionCreatedMs = new Date(watchSession.createdAt).getTime();
+            const recentEvents = await activityWatcher.getRecentEvents(watchSession.workDir, 50, sessionCreatedMs, sessionId);
+            if (recentEvents.length > 0) {
+              sendToClient(ws, 'claude.activity', { gameSessionId: sessionId, events: recentEvents });
+            }
+            break;
+          }
+
+          case 'claude.unwatchActivity': {
+            const { sessionId } = msg.payload;
+            if (!sessionId) {
+              sendToClient(ws, 'error', { message: 'sessionId is required', code: 'INVALID_MESSAGE' });
+              return;
+            }
+            activityWatcher.unwatch(sessionId);
+            break;
+          }
+
           case 'claude.requestConfig': {
             const { sessionId } = msg.payload;
             if (!sessionId) {
@@ -1243,6 +1790,7 @@ function createRESTRouter(sessionManager, fileWatcher, broadcastFn) {
       const session = sessionManager.create(dir, label, agentType);
       broadcastFn('session.update', session);
       fileWatcher.watch(session.id, dir);
+      activityWatcher.watch(session.id, dir);
       res.status(201).json(session);
     } catch (err) {
       const status = err.message.includes('Maximum sessions') ? 429
@@ -1268,6 +1816,7 @@ function createRESTRouter(sessionManager, fileWatcher, broadcastFn) {
     if (!session) return res.status(404).json({ error: 'Session not found' });
     sessionManager.kill(req.params.id);
     fileWatcher.unwatch(req.params.id);
+    activityWatcher.unwatch(req.params.id);
     res.json({ ok: true });
   });
 
@@ -1284,8 +1833,14 @@ const httpServer = http.createServer(app);
 
 const sessionManager = new SessionManager();
 const fileWatcher = new FileWatcher();
+const activityWatcher = new ClaudeActivityWatcher();
 
 const { wss, broadcast } = createWSS(httpServer, sessionManager, fileWatcher);
+
+// Wire ClaudeActivityWatcher events to WS broadcast
+activityWatcher.on('activity', (payload) => {
+  broadcast('claude.activity', payload);
+});
 
 app.use('/api', createRESTRouter(sessionManager, fileWatcher, broadcast));
 
@@ -1308,6 +1863,7 @@ function shutdown(signal) {
 
   sessionManager.killAll();
   fileWatcher.unwatchAll();
+  activityWatcher.unwatchAll();
 
   wss.close(() => {
     httpServer.close(() => {

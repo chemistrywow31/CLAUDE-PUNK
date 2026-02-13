@@ -9,6 +9,7 @@ import costTracker from '../services/costTracker.js';
 import TerminalTab from './TerminalTab.js';
 import FilesTab from './FilesTab.js';
 import ClaudeConfigTab from './ClaudeConfigTab.js';
+import ActivityPanel from './ActivityPanel.js';
 import { createDialogResizeHandles } from './resizeHandle.js';
 
 export default class DialogBox {
@@ -20,6 +21,7 @@ export default class DialogBox {
     this.visible = false;
     this.onOpen = null;
     this.onClose = null;
+    this.activityPanel = null;     // persists across tab switches for floating mode
     this.init();
   }
 
@@ -38,6 +40,7 @@ export default class DialogBox {
           <button class="tab active" data-tab="cli">Terminal</button>
           <button class="tab" data-tab="files">Files</button>
           <button class="tab" data-tab="claude">Config</button>
+          <button class="tab" data-tab="activity">Activity</button>
         </div>
         <div id="dialog-content"></div>
         <div id="dialog-input">
@@ -85,6 +88,27 @@ export default class DialogBox {
       if (e.key === 'Enter') this.sendPrompt();
     });
 
+    // Listen for activity panel popout/dock events
+    document.addEventListener('activity-popout', () => {
+      // Hide the Activity tab button, switch to another tab
+      const activityTabBtn = this.overlay.querySelector('.tab[data-tab="activity"]');
+      if (activityTabBtn) activityTabBtn.classList.add('hidden');
+      if (this.currentTab === 'activity') {
+        this.switchTab('cli');
+      }
+    });
+
+    document.addEventListener('activity-dock', () => {
+      // Show the Activity tab button again
+      const activityTabBtn = this.overlay.querySelector('.tab[data-tab="activity"]');
+      if (activityTabBtn) activityTabBtn.classList.remove('hidden');
+      // Re-add the activity panel to tabs map
+      if (this.activityPanel) {
+        this.tabs.activity = this.activityPanel;
+        this.switchTab('activity');
+      }
+    });
+
     // Listen for session state changes
     wsService.on('session.terminated', (payload) => {
       if (payload.sessionId === this.currentSessionId) {
@@ -92,6 +116,11 @@ export default class DialogBox {
       }
       // Fully tear down the cached terminal for this session
       TerminalTab.purge(payload.sessionId);
+      // Tear down activity panel (including floating mode)
+      if (this.activityPanel && this.activityPanel.sessionId === payload.sessionId) {
+        this.activityPanel.fullDestroy();
+        this.activityPanel = null;
+      }
     });
   }
 
@@ -132,11 +161,25 @@ export default class DialogBox {
     // Build tab set — reuse cached TerminalTab, fresh instances for others
     const termTab = TerminalTab.getOrCreate(sessionId);
     termTab.agentType = agentType || 'claude';
+
+    // Reuse or create ActivityPanel (persists for floating mode)
+    if (!this.activityPanel || this.activityPanel.sessionId !== sessionId) {
+      if (this.activityPanel) this.activityPanel.fullDestroy();
+      this.activityPanel = new ActivityPanel(sessionId);
+    }
+
     this.tabs = {
       cli: termTab,
       files: new FilesTab(sessionId),
       claude: new ClaudeConfigTab(sessionId),
+      activity: this.activityPanel,
     };
+
+    // Restore Activity tab button visibility
+    const activityTabBtn = this.overlay.querySelector('.tab[data-tab="activity"]');
+    if (activityTabBtn) {
+      activityTabBtn.classList.toggle('hidden', this.activityPanel.mode === 'floating');
+    }
 
     // Activate default tab
     this.switchTab('cli');
@@ -147,7 +190,7 @@ export default class DialogBox {
     this.overlay.classList.add('hidden');
     this.currentSessionId = null;
     if (this.costUnsub) { this.costUnsub(); this.costUnsub = null; }
-    // Detach tabs from DOM (TerminalTab stays alive in cache)
+    // Detach tabs from DOM (TerminalTab stays alive in cache, ActivityPanel stays alive if floating)
     this.detachTabs();
     if (this.onClose) this.onClose();
   }

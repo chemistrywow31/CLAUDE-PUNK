@@ -1,0 +1,810 @@
+/* ─── Activity Panel V2 — Multi-Section Dashboard ────────────── */
+
+/* Force scrollbars to always show (macOS overlay scrollbars hide by default) */
+.activity-panel *::-webkit-scrollbar {
+  -webkit-appearance: none;
+}
+
+.activity-panel {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+/* ─── Header ─────────────────────────────────────────────────── */
+
+.activity-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 12px;
+  border-bottom: 1px solid rgba(0, 240, 255, 0.15);
+  flex-shrink: 0;
+}
+
+.activity-title {
+  font-family: var(--font-ui);
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--accent-purple);
+  text-transform: uppercase;
+  letter-spacing: 1.5px;
+}
+
+/* ─── Context Bar (in header) ────────────────────────────────── */
+
+.context-bar-container {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: 1;
+  margin: 0 12px;
+}
+
+.context-bar-label {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  font-weight: 700;
+  color: var(--text-secondary);
+  letter-spacing: 0.5px;
+  flex-shrink: 0;
+}
+
+.context-bar-track {
+  flex: 1;
+  height: 6px;
+  background: #0a0a14;
+  border: 1px solid rgba(0, 240, 255, 0.25);
+  border-radius: 1px;
+  overflow: hidden;
+}
+
+.context-bar-fill {
+  height: 100%;
+  width: 0%;
+  background: #00f0ff;
+  transition: width 0.4s ease-out, background-color 0.3s ease;
+}
+
+.context-bar-value {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  font-weight: 700;
+  color: var(--text-secondary);
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.activity-controls {
+  display: flex;
+  gap: 4px;
+}
+
+.activity-btn {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  font-weight: 700;
+  color: var(--text-secondary);
+  background: none;
+  border: 1px solid var(--text-secondary);
+  padding: 2px 6px;
+  cursor: pointer;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  transition: all 0.15s;
+}
+
+.activity-btn:hover {
+  color: var(--border-neon);
+  border-color: var(--border-neon);
+}
+
+/* ─── Workflow Strip (fixed, large) ──────────────────────────── */
+
+.activity-workflow {
+  flex-shrink: 0;
+  min-height: 80px;
+  max-height: 130px;
+  overflow-x: scroll;
+  overflow-y: hidden;
+  padding: 10px 12px;
+  border-bottom: 1px solid rgba(0, 240, 255, 0.1);
+}
+
+.workflow-track {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  min-width: min-content;
+}
+
+.workflow-node {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 6px 12px;
+  border: 1px solid var(--node-color, #8888aa);
+  background: color-mix(in srgb, var(--node-color, #8888aa) 12%, transparent);
+  border-radius: 3px;
+  flex-shrink: 0;
+  animation: node-appear 0.25s ease-out;
+}
+
+.workflow-node .node-label {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--node-color, #8888aa);
+  letter-spacing: 0.5px;
+  line-height: 1.3;
+}
+
+.workflow-node .node-time {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  color: var(--text-secondary);
+  opacity: 0.6;
+  line-height: 1.3;
+}
+
+/* Agent tag on subagent workflow nodes */
+.workflow-node .node-agent {
+  font-family: var(--font-mono);
+  font-size: 7px;
+  color: var(--node-color, #8888aa);
+  opacity: 0.7;
+  letter-spacing: 0.3px;
+  line-height: 1.2;
+  max-width: 60px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Subagent nodes: left accent border */
+.workflow-node.workflow-agent-node {
+  border-left: 3px solid var(--node-color, #8888aa);
+}
+
+/* ── Active node pulse (issue #6: more visible) ── */
+
+.workflow-node.active {
+  animation: node-pulse 0.8s ease-in-out infinite;
+  box-shadow:
+    0 0 8px color-mix(in srgb, var(--node-color, #8888aa) 50%, transparent),
+    0 0 16px color-mix(in srgb, var(--node-color, #8888aa) 25%, transparent);
+  border-color: var(--node-color, #8888aa);
+}
+
+.workflow-arrow {
+  font-family: var(--font-mono);
+  font-size: 14px;
+  color: var(--text-secondary);
+  opacity: 0.4;
+  flex-shrink: 0;
+  user-select: none;
+}
+
+@keyframes node-appear {
+  from { transform: scale(0.3); opacity: 0; }
+  to   { transform: scale(1);   opacity: 1; }
+}
+
+@keyframes node-pulse {
+  0%, 100% {
+    opacity: 1;
+    box-shadow:
+      0 0 6px color-mix(in srgb, var(--node-color, #8888aa) 40%, transparent),
+      0 0 14px color-mix(in srgb, var(--node-color, #8888aa) 15%, transparent);
+    border-color: var(--node-color, #8888aa);
+  }
+  50% {
+    opacity: 0.6;
+    box-shadow:
+      0 0 12px color-mix(in srgb, var(--node-color, #8888aa) 70%, transparent),
+      0 0 24px color-mix(in srgb, var(--node-color, #8888aa) 35%, transparent);
+    border-color: white;
+  }
+}
+
+/* ─── Phases Panel (workflow + detail split) ──────────────────── */
+
+.activity-phases {
+  flex-shrink: 0;
+  min-height: 40px;
+  max-height: 200px;
+  padding: 6px 12px;
+  border-bottom: 1px solid rgba(0, 240, 255, 0.1);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.phases-container {
+  display: flex;
+  gap: 8px;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+}
+
+/* Left: workflow track */
+.phases-workflow {
+  flex: 7;
+  min-width: 0;
+  overflow-x: scroll;
+  overflow-y: hidden;
+  padding: 4px 0;
+}
+
+.phases-track {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  min-width: min-content;
+}
+
+/* Right: detail panel */
+.phases-detail {
+  flex: 3;
+  min-width: 0;
+  overflow-y: auto;
+  padding: 4px 8px;
+  border-left: 1px solid rgba(0, 240, 255, 0.1);
+  font-family: var(--font-mono);
+  font-size: 10px;
+}
+
+.phases-empty {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  color: var(--text-secondary);
+  opacity: 0.4;
+  padding: 2px 0;
+}
+
+/* ── Phase node (workflow-style) ── */
+
+.phase-node {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 5px 10px;
+  border: 1px solid var(--phase-color, #8888aa);
+  background: color-mix(in srgb, var(--phase-color, #8888aa) 8%, transparent);
+  border-radius: 3px;
+  flex-shrink: 0;
+  cursor: pointer;
+  transition: background 0.15s, box-shadow 0.15s;
+  animation: node-appear 0.25s ease-out;
+  min-width: 48px;
+}
+
+.phase-node:hover {
+  background: color-mix(in srgb, var(--phase-color, #8888aa) 18%, transparent);
+}
+
+.phase-node-num {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--phase-color, #8888aa);
+  line-height: 1.2;
+}
+
+.phase-node-label {
+  font-family: var(--font-mono);
+  font-size: 8px;
+  color: var(--text-primary);
+  max-width: 72px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  line-height: 1.3;
+  opacity: 0.8;
+}
+
+.phase-node-icon {
+  font-size: 8px;
+  color: var(--phase-color, #8888aa);
+  line-height: 1;
+}
+
+/* Selected node */
+.phase-node.phase-selected {
+  background: color-mix(in srgb, var(--phase-color, #8888aa) 20%, transparent);
+  box-shadow:
+    0 0 6px color-mix(in srgb, var(--phase-color, #8888aa) 40%, transparent),
+    inset 0 0 4px color-mix(in srgb, var(--phase-color, #8888aa) 15%, transparent);
+  border-width: 2px;
+  padding: 4px 9px;
+}
+
+/* In-progress node pulses */
+.phase-node.phase-active {
+  animation: phase-pulse 0.8s ease-in-out infinite;
+}
+
+/* Completed node: muted */
+.phase-node.phase-done {
+  opacity: 0.65;
+}
+.phase-node.phase-done:hover {
+  opacity: 0.9;
+}
+
+@keyframes phase-pulse {
+  0%, 100% {
+    box-shadow: 0 0 4px color-mix(in srgb, var(--phase-color) 30%, transparent);
+    border-color: var(--phase-color);
+  }
+  50% {
+    box-shadow:
+      0 0 10px color-mix(in srgb, var(--phase-color) 60%, transparent),
+      0 0 20px color-mix(in srgb, var(--phase-color) 25%, transparent);
+    border-color: white;
+  }
+}
+
+/* ── Phase detail panel ── */
+
+.phase-detail-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+
+.phase-detail-title {
+  font-weight: 700;
+  font-size: 11px;
+  color: var(--text-primary);
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.phase-detail-badge {
+  font-size: 8px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  padding: 1px 5px;
+  border-radius: 2px;
+  flex-shrink: 0;
+  text-transform: uppercase;
+}
+
+.phase-badge-pending {
+  color: #8888aa;
+  background: rgba(136, 136, 170, 0.12);
+  border: 1px solid rgba(136, 136, 170, 0.3);
+}
+
+.phase-badge-in_progress {
+  color: #ffaa00;
+  background: rgba(255, 170, 0, 0.12);
+  border: 1px solid rgba(255, 170, 0, 0.3);
+  animation: agent-dot-blink 0.9s ease-in-out infinite;
+}
+
+.phase-badge-completed {
+  color: #00ff88;
+  background: rgba(0, 255, 136, 0.12);
+  border: 1px solid rgba(0, 255, 136, 0.3);
+}
+
+.phase-detail-active {
+  color: #ffaa00;
+  font-style: italic;
+  font-size: 10px;
+  margin-bottom: 4px;
+  padding: 2px 0;
+}
+
+.phase-detail-desc {
+  color: var(--text-primary);
+  opacity: 0.85;
+  font-size: 10px;
+  line-height: 1.5;
+  word-break: break-word;
+  white-space: pre-wrap;
+}
+
+.phase-detail-time {
+  color: var(--text-secondary);
+  font-size: 9px;
+  opacity: 0.5;
+  margin-top: 6px;
+}
+
+/* ─── Agents Panel (fixed, large) ────────────────────────────── */
+
+.activity-agents {
+  flex-shrink: 0;
+  min-height: 70px;
+  max-height: 220px;
+  overflow-y: auto;
+  padding: 8px 12px;
+  border-bottom: 1px solid rgba(0, 240, 255, 0.1);
+}
+
+.section-label {
+  font-family: var(--font-ui);
+  font-size: 9px;
+  font-weight: 700;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  margin-bottom: 3px;
+  opacity: 0.7;
+}
+
+/* Clickable section labels (collapsible) */
+.section-label.collapsible {
+  cursor: pointer;
+  user-select: none;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.section-label.collapsible:hover {
+  opacity: 1;
+  color: var(--border-neon);
+}
+
+.collapse-icon {
+  font-size: 8px;
+  transition: transform 0.15s;
+  display: inline-block;
+}
+
+.activity-section.collapsed .collapse-icon {
+  transform: rotate(-90deg);
+}
+
+.agent-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.agent-card {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  border: 1px solid rgba(128, 64, 192, 0.3);
+  background: rgba(128, 64, 192, 0.06);
+  border-radius: 3px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  max-width: 240px;
+  transition: box-shadow 0.2s, border-color 0.2s;
+}
+
+.agent-card .agent-name {
+  color: var(--text-primary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.agent-card .agent-type {
+  color: var(--accent-purple);
+  font-size: 9px;
+  opacity: 0.7;
+}
+
+.agent-card .agent-status {
+  flex-shrink: 0;
+  font-size: 10px;
+}
+
+.agent-card.agent-active .agent-status { color: #00ff88; }
+.agent-card.agent-idle .agent-status   { color: #8888aa; }
+
+.agent-card.agent-active {
+  border-color: rgba(128, 64, 192, 0.6);
+  background: rgba(128, 64, 192, 0.12);
+}
+
+/* Agent blinking: active agents blink when workflow tail is agent-related */
+.agent-card.agent-blink {
+  animation: agent-card-blink 0.9s ease-in-out infinite;
+}
+
+.agent-card.agent-blink .agent-status {
+  animation: agent-dot-blink 0.9s ease-in-out infinite;
+}
+
+@keyframes agent-card-blink {
+  0%, 100% {
+    border-color: rgba(0, 255, 136, 0.3);
+    box-shadow: 0 0 4px rgba(0, 255, 136, 0.1);
+  }
+  50% {
+    border-color: rgba(0, 255, 136, 0.8);
+    box-shadow: 0 0 10px rgba(0, 255, 136, 0.3), 0 0 20px rgba(0, 255, 136, 0.1);
+  }
+}
+
+@keyframes agent-dot-blink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.3; }
+}
+
+.agent-card.skill-card {
+  border-color: rgba(0, 240, 255, 0.3);
+  background: rgba(0, 240, 255, 0.06);
+}
+
+.agent-card.team-card {
+  border-color: rgba(255, 0, 128, 0.3);
+  background: rgba(255, 0, 128, 0.06);
+}
+
+.agents-empty {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  color: var(--text-secondary);
+  opacity: 0.4;
+  padding: 2px 0;
+}
+
+/* ─── Detail Area (left/right flex split) ────────────────────── */
+
+.activity-detail-area {
+  flex: 1;
+  display: flex;
+  gap: 3px;
+  padding: 3px;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.detail-left {
+  flex: 0 0 40%;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.detail-right {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-height: 0;
+  overflow: hidden;
+}
+
+/* ─── Sections (collapsible) ─────────────────────────────────── */
+
+.activity-section {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border: 1px solid rgba(0, 240, 255, 0.08);
+  border-radius: 2px;
+  min-height: 0;
+  flex: 1;
+}
+
+.activity-section .section-label {
+  padding: 3px 6px;
+  border-bottom: 1px solid rgba(0, 240, 255, 0.06);
+  flex-shrink: 0;
+}
+
+.activity-section.collapsed {
+  flex: 0 0 auto;
+}
+
+.activity-section.collapsed .section-content {
+  display: none;
+}
+
+.activity-section.collapsed .section-label {
+  border-bottom: none;
+}
+
+.section-content {
+  flex: 1;
+  overflow-y: auto;
+  padding: 3px 6px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--text-primary);
+  min-height: 0;
+}
+
+/* ─── Thinking ───────────────────────────────────────────────── */
+
+.activity-section.thinking .section-content {
+  white-space: pre-wrap;
+  word-break: break-word;
+  color: rgba(128, 64, 192, 0.85);
+  font-size: 10px;
+  line-height: 1.4;
+}
+
+/* ─── Plan ───────────────────────────────────────────────────── */
+
+.activity-section.plan {
+  display: none;
+}
+
+.activity-section.plan.has-content {
+  display: flex;
+}
+
+.activity-section.plan.has-content.collapsed {
+  display: flex;
+  flex: 0 0 auto;
+}
+
+.activity-section.plan .section-content {
+  white-space: pre-wrap;
+  word-break: break-word;
+  font-size: 10px;
+  line-height: 1.4;
+  color: rgba(255, 0, 128, 0.85);
+}
+
+/* ─── Files ──────────────────────────────────────────────────── */
+
+.activity-section.files .section-content {
+  font-size: 10px;
+}
+
+.file-entry {
+  display: flex;
+  align-items: baseline;
+  gap: 4px;
+  padding: 1px 0;
+}
+
+.file-action {
+  font-size: 8px;
+  font-weight: 700;
+  flex-shrink: 0;
+  width: 32px;
+  text-align: center;
+}
+
+.file-action.write { color: #ffaa00; }
+.file-action.edit  { color: #ffaa00; }
+
+.file-path {
+  color: var(--text-primary);
+  word-break: break-all;
+  min-width: 0;
+}
+
+/* ─── Right column: Files (small) + Text & Bash (large) ──────── */
+
+.detail-right .activity-section.files {
+  flex: 0 0 auto;
+  max-height: 120px;
+}
+
+.detail-right .activity-section.textbash {
+  flex: 1;
+}
+
+.activity-section.textbash .section-content {
+  font-size: 10px;
+}
+
+.textbash-event {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  padding: 1px 2px;
+  line-height: 1.4;
+}
+
+.textbash-event:hover {
+  background: rgba(0, 240, 255, 0.03);
+}
+
+.textbash-time {
+  color: var(--text-secondary);
+  font-size: 9px;
+  flex-shrink: 0;
+  opacity: 0.6;
+  white-space: nowrap;
+}
+
+.textbash-badge {
+  font-size: 8px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  flex-shrink: 0;
+  width: 36px;
+  text-align: center;
+  white-space: nowrap;
+}
+
+.textbash-text {
+  color: var(--text-primary);
+  flex: 1;
+  min-width: 0;
+  word-break: break-word;
+}
+
+.textbash-event.error-event .textbash-text {
+  color: #ff0080;
+}
+
+/* ─── Floating Panel ─────────────────────────────────────────── */
+
+.activity-float-panel {
+  position: fixed;
+  z-index: 1100;
+  width: 520px;
+  height: 540px;
+  display: flex;
+  flex-direction: column;
+}
+
+.activity-float-panel .activity-header {
+  cursor: grab;
+}
+
+.activity-float-panel .activity-header:active {
+  cursor: grabbing;
+}
+
+/* ─── Scrollbars (issue #5: visible on all scrollable areas) ── */
+
+.activity-workflow,
+.phases-workflow,
+.phases-detail,
+.activity-agents,
+.section-content {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(0, 240, 255, 0.35) transparent;
+}
+
+.activity-workflow::-webkit-scrollbar,
+.phases-workflow::-webkit-scrollbar,
+.phases-detail::-webkit-scrollbar,
+.activity-agents::-webkit-scrollbar,
+.section-content::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+.activity-workflow::-webkit-scrollbar-track,
+.phases-workflow::-webkit-scrollbar-track,
+.phases-detail::-webkit-scrollbar-track,
+.activity-agents::-webkit-scrollbar-track,
+.section-content::-webkit-scrollbar-track {
+  background: rgba(0, 240, 255, 0.04);
+  border-radius: 3px;
+}
+
+.activity-workflow::-webkit-scrollbar-thumb,
+.phases-workflow::-webkit-scrollbar-thumb,
+.phases-detail::-webkit-scrollbar-thumb,
+.activity-agents::-webkit-scrollbar-thumb,
+.section-content::-webkit-scrollbar-thumb {
+  background: rgba(0, 240, 255, 0.35);
+  border-radius: 3px;
+}
+
+.activity-workflow::-webkit-scrollbar-thumb:hover,
+.phases-workflow::-webkit-scrollbar-thumb:hover,
+.phases-detail::-webkit-scrollbar-thumb:hover,
+.activity-agents::-webkit-scrollbar-thumb:hover,
+.section-content::-webkit-scrollbar-thumb:hover {
+  background: rgba(0, 240, 255, 0.55);
+}

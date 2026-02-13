@@ -190,6 +190,14 @@ class WebSocketService {
   downloadFile(sessionId, filePath) {
     return this.send('file.download', { sessionId, filePath });
   }
+
+  watchActivity(sessionId) {
+    return this.send('claude.watchActivity', { sessionId });
+  }
+
+  unwatchActivity(sessionId) {
+    return this.send('claude.unwatchActivity', { sessionId });
+  }
 }
 
 // Singleton

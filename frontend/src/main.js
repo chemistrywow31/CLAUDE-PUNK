@@ -28,6 +28,7 @@ import './styles/retro-tv.css';
 import './styles/file-warp.css';
 import './styles/file-editor.css';
 import './styles/theme-settings.css';
+import './styles/activity-monitor.css';
 
 // ─── Game Configuration ─────────────────────────────────────────
 
